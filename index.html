@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Video Course</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f6fb;--surface:#ffffff;--surface2:#eef0f7;--border:#dde2ed;
+  --text:#1c2540;--muted:#64748b;--accent:#2563eb;--ab:#3b82f6;
+  --watched:#10b981;--watched-dim:rgba(16,185,129,0.08);
+  --exit:#ef4444;--exit-bg:rgba(239,68,68,0.08);--exit-border:rgba(239,68,68,0.25);
+  --bookmark:#f59e0b;--bookmark-bg:rgba(245,158,11,0.08);
+  --mono:'Aptos','Segoe UI',system-ui,sans-serif;--sans:'Aptos','Segoe UI',system-ui,sans-serif;
+  --hover:#e8ebf5;--watched-border:rgba(16,185,129,0.35);--watched-sub:rgba(16,185,129,0.6);
+  --overlay-bg:#ffffff;--overlay-border:#dde2ed;
+  --tag-bg:rgba(37,99,235,0.08);--tag-border:rgba(37,99,235,0.2);
+  --active-clr:#2563eb;--active-bg:rgba(37,99,235,0.08);--active-border:rgba(37,99,235,0.25);
+  --sc-clr:#059669;--sc-bg:rgba(5,150,105,0.08);--sc-border:rgba(5,150,105,0.3);--sc-hover-bg:rgba(5,150,105,0.12);--sc-hover-border:rgba(5,150,105,0.5);
+  --exitbtn-clr:#dc2626;--exitbtn-bg:rgba(220,38,38,0.07);--exitbtn-border:rgba(220,38,38,0.28);--exitbtn-shadow:rgba(220,38,38,0.15);
+  --watched-num:#059669;
+  --warn-clr:#b45309;--warn-bg:rgba(180,83,9,0.08);--warn-border:rgba(180,83,9,0.35);--warn-sub:rgba(180,83,9,0.70)
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:20px}
+.shell{width:100%;max-width:900px;display:flex;flex-direction:column;gap:0}
+.hdr{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.hdr h1{font-size:1rem;font-weight:500;letter-spacing:.02em;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.course-desc{font-size:.8rem;color:var(--muted);margin-bottom:14px;line-height:1.6;}
+.tag{font-family:var(--mono);font-size:.6rem;color:var(--ab);
+  background:var(--tag-bg);border:1px solid var(--tag-border);
+  padding:2px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.08em;flex-shrink:0}
+.exitbtn{background:var(--exitbtn-bg);border:1.5px solid var(--exitbtn-border);color:var(--exitbtn-clr);
+  border-radius:6px;padding:7px 18px;font-size:.78rem;cursor:pointer;font-family:var(--sans);
+  font-weight:600;transition:background .15s,border-color .15s,box-shadow .15s;
+  flex-shrink:0;letter-spacing:.04em;box-shadow:none}
+.exitbtn:hover{filter:brightness(1.15);box-shadow:0 0 12px var(--exitbtn-shadow)}
+.vframe{background:#000;border-radius:8px 8px 0 0;overflow:hidden;
+  border:1px solid var(--border);border-bottom:none;position:relative}
+video{display:block;width:100%;max-height:500px;object-fit:contain;background:#000}
+.shell:fullscreen,.shell:-webkit-full-screen,.shell:-moz-full-screen{
+  max-width:100%;width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
+.shell:fullscreen .vframe,.shell:-webkit-full-screen .vframe,.shell:-moz-full-screen .vframe{
+  flex:1;min-height:0;border-radius:0}
+.shell:fullscreen video,.shell:-webkit-full-screen video,.shell:-moz-full-screen video{
+  max-height:100%;height:100%}
+.controls{background:var(--surface);border:1px solid var(--border);
+  border-top:none;border-radius:0 0 8px 8px;padding:14px 16px 16px;
+  display:flex;flex-direction:column;gap:12px}
+.seekwrap{position:relative;height:10px;background:var(--surface2);
+  border-radius:5px;cursor:pointer;overflow:visible}
+.seekcanvas{position:absolute;inset:0;width:100%;height:100%;
+  border-radius:5px;pointer-events:none;overflow:hidden}
+.thumb{position:absolute;top:50%;width:14px;height:14px;background:var(--text);
+  border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;
+  box-shadow:0 0 0 2px rgba(0,0,0,.6);z-index:2;
+  transition:width .1s,height .1s;flex-shrink:0}
+.seekwrap:hover .thumb{width:18px;height:18px}
+.seek-tooltip{position:absolute;bottom:calc(100% + 8px);background:var(--overlay-bg);border:1px solid var(--overlay-border);color:var(--text);font-family:var(--mono);font-size:.68rem;padding:3px 8px;border-radius:4px;pointer-events:none;white-space:nowrap;opacity:0;transition:opacity .1s;transform:translateX(-50%);z-index:10}
+.seekwrap:hover .seek-tooltip{opacity:1}
+.crow{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;min-width:0}
+.pbtn{width:38px;height:38px;background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:14px;cursor:pointer;flex-shrink:0;transition:background .15s}
+.pbtn:hover{background:var(--hover)}
+.pbtn.playing{gap:4px}
+.pbtn.playing::before,.pbtn.playing::after{content:'';display:block;width:4px;height:14px;background:currentColor;border-radius:1px;flex-shrink:0}
+.rwbtn{width:32px;height:32px;background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:11px;cursor:pointer;flex-shrink:0;transition:background .15s;
+  font-family:var(--mono);font-weight:600;letter-spacing:-.03em}
+.rwbtn:hover{background:var(--hover)}
+.timedisp{font-family:var(--mono);font-size:.72rem;color:var(--muted);
+  letter-spacing:.04em;white-space:nowrap;flex-shrink:0}
+.vrow{display:flex;align-items:center;gap:8px}
+.vicon{cursor:pointer;user-select:none;font-size:.85rem}
+input[type=range].vslider{-webkit-appearance:none;width:70px;height:4px;
+  background:var(--border);border-radius:2px;outline:none;cursor:pointer}
+input[type=range].vslider::-webkit-slider-thumb{-webkit-appearance:none;
+  width:12px;height:12px;background:var(--text);border-radius:50%}
+.fbtn{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  border-radius:6px;padding:6px 12px;font-size:.75rem;cursor:pointer;
+  font-family:var(--sans);transition:background .15s}
+.fbtn:hover{background:var(--hover)}
+.ccbtn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);
+  border-radius:6px;padding:6px 10px;font-size:.72rem;cursor:pointer;font-weight:600;
+  font-family:var(--mono);transition:background .15s,color .15s,border-color .15s;letter-spacing:.04em}
+.ccbtn:hover{background:var(--hover)}
+.ccbtn.active{color:var(--active-clr);border-color:var(--active-border);background:var(--active-bg)}
+.themebtn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);
+  border-radius:6px;padding:6px 10px;font-size:.72rem;cursor:pointer;font-weight:600;
+  font-family:var(--mono);letter-spacing:.04em;position:relative}
+.themebtn:hover{background:var(--hover);color:var(--text)}
+.thpop{display:none;position:absolute;bottom:calc(100% + 8px);right:0;
+  background:var(--overlay-bg);border:1px solid var(--overlay-border);
+  border-radius:8px;padding:8px;min-width:172px;z-index:50;
+  box-shadow:0 4px 20px rgba(0,0,0,0.2)}
+.thpop.open{display:block}
+.thpop-lbl{font-family:var(--mono);font-size:.55rem;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px;padding:0 3px}
+.thopt{width:100%;text-align:left;background:none;border:1px solid transparent;
+  border-radius:5px;padding:5px 7px;font-size:.75rem;cursor:pointer;
+  font-family:var(--sans);color:var(--text);display:flex;align-items:center;gap:7px;
+  transition:background .1s}
+.thopt:hover{background:var(--hover)}
+.thopt.active{background:var(--active-bg);color:var(--active-clr);border-color:var(--active-border)}
+.thdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;outline:1px solid rgba(0,0,0,0.15)}
+select.speedsel{background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);border-radius:6px;padding:5px 8px;font-size:.72rem;cursor:pointer;
+  font-weight:600;font-family:var(--mono);letter-spacing:.04em;outline:none;
+  -webkit-appearance:none;appearance:none}
+select.speedsel:focus{border-color:var(--accent)}
+select.speedsel.active{color:var(--active-clr);border-color:var(--active-border);background:var(--active-bg)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:var(--border);border:1px solid var(--border);border-radius:7px;
+  overflow:hidden;margin-top:10px}
+.stat{background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.slbl{font-family:var(--mono);font-size:.58rem;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.1em}
+.sval{font-family:var(--mono);font-size:1.2rem;font-weight:500;
+  color:var(--text);transition:color .3s}
+.sval.done{color:var(--watched)}
+#pw{color:var(--watched-num)}
+.banner{display:none;align-items:center;gap:12px;
+  background:var(--watched-dim);border:1px solid var(--watched-border);
+  border-radius:7px;padding:12px 16px;margin-top:8px}
+.banner.on{display:flex}
+.incompletebanner{display:none;align-items:center;gap:12px;
+  background:var(--warn-bg);border:1px solid var(--warn-border);
+  border-radius:7px;padding:12px 16px;margin-top:8px}
+.incompletebanner.on{display:flex}
+.xico{font-size:1.1rem}
+.xtxt{font-size:.82rem;font-weight:500;color:var(--warn-clr)}
+.xsub{font-family:var(--mono);font-size:.75rem;color:var(--warn-sub);margin-top:4px;line-height:1.5}
+.xbtn{margin-left:auto;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);
+  color:#fbbf24;border-radius:5px;padding:6px 14px;font-size:.75rem;
+  cursor:pointer;font-family:var(--sans);font-weight:500;transition:background .15s;
+  white-space:nowrap;flex-shrink:0}
+.xbtn:hover{background:rgba(251,191,36,.28)}
+.bico{font-size:1.1rem}
+.btxt{font-size:.82rem;font-weight:500;color:var(--watched)}
+.bsub{font-family:var(--mono);font-size:.62rem;color:var(--watched-sub);margin-top:2px}
+.resumebanner{display:none;align-items:center;gap:12px;
+  background:var(--warn-bg);border:1px solid var(--warn-border);
+  border-radius:7px;padding:12px 16px;margin-top:8px}
+.resumebanner.on{display:flex}
+.rbico{font-size:1rem}
+.rtxt{font-size:.82rem;font-weight:500;color:var(--warn-clr)}
+.rsub{font-family:var(--mono);font-size:.62rem;color:var(--warn-sub);margin-top:2px}
+.rbtn{margin-left:auto;background:rgba(250,204,21,.15);border:1px solid rgba(250,204,21,.4);
+  color:var(--bookmark);border-radius:5px;padding:4px 12px;font-size:.72rem;
+  cursor:pointer;font-family:var(--sans);transition:background .15s;white-space:nowrap}
+.rbtn:hover{background:rgba(250,204,21,.25)}
+.selfcomplete{display:none;width:100%;margin-top:10px;
+  background:var(--sc-bg);border:1px solid var(--sc-border);
+  color:var(--sc-clr);border-radius:7px;padding:10px 16px;font-size:.82rem;
+  cursor:pointer;font-family:var(--sans);font-weight:500;transition:background .15s,border-color .15s;
+  letter-spacing:.02em;text-align:center}
+.selfcomplete:hover{background:var(--sc-hover-bg);border-color:var(--sc-hover-border)}
+.selfcomplete.visible{display:block}
+.lmsrow{display:flex;align-items:center;gap:7px;margin-top:8px}
+.warnbanner{display:none;align-items:center;gap:12px;
+  background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.4);
+  border-radius:7px;padding:12px 16px;margin-top:8px}
+.warnbanner.on{display:flex}
+.wico{font-size:1.1rem}
+.wtxt{font-size:.82rem;font-weight:500;color:#fca5a5}
+.wsub{font-family:var(--mono);font-size:.62rem;color:rgba(252,165,165,0.6);margin-top:2px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:background .4s}
+.dot.ok{background:var(--watched);box-shadow:0 0 5px var(--watched)}
+.dot.err{background:#f87171}
+.dlbl{font-family:var(--mono);font-size:.58rem;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.1em}
+.ack-modal-body{font-size:.88rem;color:var(--text);line-height:1.7;background:rgba(255,255,255,.04);border:1px solid #2b2b3e;border-radius:7px;padding:14px 16px;margin:0}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+  z-index:100;align-items:center;justify-content:center}
+.overlay.on{display:flex}
+.modal{background:var(--overlay-bg);border:1px solid var(--overlay-border);border-radius:12px;
+  padding:28px 28px 24px;max-width:360px;width:90%;display:flex;flex-direction:column;gap:16px}
+.modal-title{font-size:.95rem;font-weight:600;color:var(--text)}
+.modal-body{font-size:.8rem;color:var(--muted);line-height:1.6}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end}
+.mbtn{border-radius:7px;padding:7px 18px;font-size:.78rem;cursor:pointer;
+  font-family:var(--sans);font-weight:500;transition:opacity .15s;border:1px solid transparent}
+.mbtn:hover{opacity:.8}
+.mbtn-cancel{background:var(--surface2);border-color:var(--border);color:var(--muted)}
+.mbtn-exit{background:var(--exit-bg);border-color:var(--exit-border);color:var(--exit)}
+.dbg-panel{display:none;position:fixed;bottom:0;left:0;right:0;
+  background:#0a0a0f;border-top:2px solid var(--accent);
+  z-index:9999;max-height:220px;flex-direction:column;font-family:var(--mono)}
+.dbg-panel.on{display:flex}
+.dbg-header{display:flex;align-items:center;gap:10px;padding:6px 12px;
+  background:#111118;border-bottom:1px solid #2b2b3e;flex-shrink:0}
+.dbg-title{font-size:.65rem;color:var(--ab);text-transform:uppercase;
+  letter-spacing:.12em;flex:1}
+.dbg-complete{background:none;border:1px solid rgba(255,255,255,.06);
+  color:rgba(255,255,255,.12);font-size:.6rem;font-family:var(--mono);padding:2px 10px;
+  border-radius:3px;cursor:pointer;letter-spacing:.06em;font-weight:600;transition:all .2s}
+.dbg-complete:hover{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.3);
+  color:rgba(134,239,172,.6)}
+.dbg-clear{background:none;border:1px solid #2b2b3e;color:var(--muted);
+  font-size:.6rem;font-family:var(--mono);padding:2px 8px;border-radius:3px;
+  cursor:pointer;letter-spacing:.06em}
+.dbg-clear:hover{border-color:var(--accent);color:var(--text)}
+.dbg-close{background:none;border:none;color:var(--muted);cursor:pointer;
+  font-size:.85rem;line-height:1;padding:2px 4px}
+.dbg-close:hover{color:var(--exit)}
+.dbg-log{flex:1;overflow-y:auto;padding:6px 0;font-size:.65rem;line-height:1.8}
+.dbg-row{display:grid;grid-template-columns:100px 160px 1fr;gap:0 8px;
+  padding:1px 12px;border-bottom:1px solid rgba(255,255,255,.03);
+  min-width:0}
+.dbg-row>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.dbg-row:last-child{border-bottom:none}
+.dbg-row.in{color:#86efac}
+.dbg-row.out{color:#93c5fd}
+.dbg-row.err{color:#fca5a5}
+.dbg-row.info{color:#a0a0c0}
+.dbg-time{color:rgba(255,255,255,.3);font-size:.6rem}
+.dbg-fn{color:var(--muted)}
+.dbg-row.in .dbg-fn{color:#4ade80}
+.dbg-row.out .dbg-fn{color:#60a5fa}
+.dbg-row.err .dbg-fn{color:#f87171}
+::cue{background:rgba(0,0,0,.75);color:#fff;font-size:.9em;font-family:var(--sans)}
+.vframe{cursor:pointer}
+.vframe .play-flash{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);
+  width:72px;height:72px;background:rgba(0,0,0,.52);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;
+  pointer-events:none;transition:transform .2s ease,opacity .3s;opacity:0;z-index:5}
+.vframe .play-flash.pop{transform:translate(-50%,-50%) scale(1);opacity:1}
+.vframe .play-flash.idle{transform:translate(-50%,-50%) scale(1);opacity:1;
+  transition:opacity .4s}
+.ext-resources{margin-top:12px;border:1px solid var(--border);border-radius:7px;overflow:hidden}
+.ext-resources-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;
+  background:var(--surface2);border-bottom:1px solid var(--border)}
+.ext-resources-hdr-icon{font-size:.85rem}
+.ext-resources-hdr-title{font-family:var(--mono);font-size:.65rem;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.1em;flex:1}
+.ext-link-list{display:flex;flex-direction:column}
+.ext-link-item{display:flex;align-items:center;gap:10px;padding:9px 14px;
+  border-bottom:1px solid var(--border);background:none;border-left:none;border-right:none;
+  border-top:none;width:100%;text-align:left;cursor:pointer;
+  transition:background .15s}
+.ext-link-item:last-child{border-bottom:none}
+.ext-link-item:hover{background:var(--surface2)}
+.ext-link-title{font-size:.82rem;color:var(--accent);font-weight:500;flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ext-link-arrow{font-size:.7rem;color:var(--muted);flex-shrink:0;font-family:var(--mono)}
+</style>
+</head>
+<body>
+
+<!-- Exit confirmation modal -->
+<div class="overlay" id="exitOverlay">
+  <div class="modal">
+    <div class="modal-title">Exit course?</div>
+    <div class="modal-body" id="exitModalBody">Your progress will be saved and you can resume from where you left off next time.</div>
+    <div class="modal-actions">
+      <button class="mbtn mbtn-cancel" id="cancelExitBtn">Keep watching</button>
+      <button class="mbtn mbtn-exit" id="confirmExitBtn">Save &amp; exit</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="overlay" id="ackOverlay"><div class="modal"><div class="modal-title">Before you go</div><p class="ack-modal-body" id="ackModalBody">I confirm that I have watched this video and understand its content.</p><div class="modal-actions"><button class="mbtn mbtn-cancel" id="ackDeclineBtn">Cancel</button><button class="mbtn mbtn-exit" id="ackConfirmBtn">Acknowledge</button></div></div></div>
+<div class="shell">
+  <div class="hdr">
+    <h1>Video Course</h1>
+    <button class="exitbtn" id="exitBtn">&#x2715; Exit</button>
+  </div>
+  <p class="course-desc" id="coursedesc" style="display:none"></p>
+  <div class="vframe" id="vframe">
+    <div class="play-flash" id="playFlash">&#9654;</div>
+    <video id="vid" preload="metadata">
+      <source src="video.mp4" type="video/mp4"/>
+      <track id="cctrack" kind="subtitles" label="Captions" src=""/>
+    </video>
+  </div>
+  <div class="controls">
+    <div class="seekwrap" id="sw">
+      <canvas id="sc" class="seekcanvas"></canvas>
+      <div class="thumb" id="th"></div>
+      <div class="seek-tooltip" id="seekTip">0:00</div>
+    </div>
+    <div class="crow">
+      <button class="pbtn" id="pb">&#9654;</button>
+      <button class="rwbtn" id="rwb" title="Rewind 5 seconds">&#x2212;5</button>
+      <span class="timedisp" id="td">0:00 / 0:00</span>
+      <div class="vrow">
+        <span class="vicon" id="mb">&#128266;</span>
+        <input type="range" class="vslider" id="vs" min="0" max="1" step="0.05" value="1"/>
+      </div>
+      <span style="flex:1"></span>
+      <button class="ccbtn" id="ccbtn" style="display:none">CC</button>
+      <select class="speedsel" id="speedsel" title="Playback speed">
+        <option value="1" selected>1x</option>
+        <option value="1.25">1.25x</option>
+        <option value="1.5">1.5x</option>
+        <option value="2">2x</option>
+      </select>
+      <div style="position:relative" id="themeWrap">
+        <button class="themebtn" id="themeBtn" onclick="toggleThemePop(event)">&#9676; Theme</button>
+        <div class="thpop" id="thpop">
+          <div class="thpop-lbl">Player theme</div>
+          <button class="thopt" data-th="bmcd" onclick="applyTheme('bmcd')"><span class="thdot" style="background:#0049CD"></span>Burns &amp; McDonnell</button>
+          <button class="thopt" data-th="a11y" onclick="applyTheme('a11y')"><span class="thdot" style="background:#0050b3"></span>Most Accessible</button>
+          <button class="thopt" data-th="clean" onclick="applyTheme('clean')"><span class="thdot" style="background:#2563eb"></span>Clean (light)</button>
+          <button class="thopt" data-th="techie" onclick="applyTheme('techie')"><span class="thdot" style="background:#5b6af0"></span>Techie (dark)</button>
+          <div class="hotdog-sep" style="display:none;border:none;border-top:1px solid var(--overlay-border);margin:5px 0"></div>
+          <button class="thopt hotdog-opt" data-th="hotdog" onclick="applyTheme('hotdog')" style="display:none"><span class="thdot" style="background:#FF0000;outline:1.5px solid #FFFF00;outline-offset:1px"></span>&#127991; Hot Dog Stand</button>
+        </div>
+      </div>
+      <button class="fbtn" id="fsb">&#9974; Fullscreen</button>
+    </div>
+  </div>
+  <div class="incompletebanner" id="xb">
+    <span class="xico">&#9888;</span>
+    <div style="flex:1;min-width:0;">
+      <div class="xtxt">You haven&#39;t finished yet</div>
+      <div class="xsub" id="xsub">Rewind and watch the remaining sections to complete this course</div>
+    </div>
+    <button class="xbtn" id="goToGapBtn">&#9664; Go to first gap</button>
+  </div>
+  <div class="resumebanner" id="rb">
+    <span class="rbico">&#9646;</span>
+    <div>
+      <div class="rtxt">Progress restored</div>
+      <div class="rsub" id="rsub">Resuming from saved position</div>
+    </div>
+    <button class="rbtn" id="resumeBtn">Resume &#9654;</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><span class="slbl">Watched</span><span class="sval" id="pw">0%</span></div>
+    <div class="stat"><span class="slbl">Needed</span><span class="sval" id="nd">100%</span></div>
+    <div class="stat"><span class="slbl">Status</span><span class="sval" id="sv">Incomplete</span></div>
+  </div>
+  <button class="selfcomplete" id="selfCompleteBtn">&#10003; Mark as complete</button>
+  <div class="banner" id="bn">
+    <span class="bico">&#10003;</span>
+    <div>
+      <div class="btxt" id="bnTitle">Completion recorded</div>
+      <div class="bsub" id="bnSub">100% threshold reached &mdash; Learning Management System notified</div>
+    </div>
+  </div>
+  <div class="warnbanner" id="wb">
+    <span class="wico">&#9888;</span>
+    <div>
+      <div class="wtxt">Learning Management System connection lost</div>
+      <div class="wsub">Your progress is not being tracked. Please exit and relaunch the module.</div>
+    </div>
+  </div>
+  <div class="lmsrow">
+    <div class="dot" id="dt"></div>
+    <span class="dlbl" id="dl">Initializing Learning Management System&hellip;</span>
+  </div>
+  <div class="ext-resources" id="extResources" style="display:none">
+    <div class="ext-resources-hdr">
+      <span class="ext-resources-hdr-icon">&#128279;</span>
+      <span class="ext-resources-hdr-title">External Resources</span>
+    </div>
+    <div class="ext-link-list" id="extLinkList"></div>
+  </div>
+</div>
+
+<div class="dbg-panel" id="dbgPanel">
+  <div class="dbg-header">
+    <span class="dbg-title">&#9679; SCORM Debug</span>
+    <button class="dbg-complete" id="dbgComplete">&#10003; Force Complete</button>
+    <button class="dbg-clear" id="dbgClear">Clear</button>
+    <button class="dbg-close" id="dbgClose">&#x2715;</button>
+  </div>
+  <div class="dbg-log" id="dbgLog"></div>
+</div>
+
+<script>
+// ── SCORM 1.2 API ──────────────────────────────────────────────────────────
+const SCORM=(()=>{
+  let api=null,init=false;
+  function find(w){
+    let n=0;
+    while(n<10){
+      try{if(w.API)return w.API;if(!w.parent||w.parent===w)break;w=w.parent;}
+      catch(e){break;}
+      n++;
+    }
+    return null;
+  }
+  function notifyDisconnect(){if(typeof onLmsDisconnect==='function')onLmsDisconnect();}
+  function start(){
+    try{
+      api=find(window);
+      if(!api){try{if(window.opener)api=find(window.opener);}catch(e){}}
+      if(!api)return false;
+      const r=api.LMSInitialize('');
+      init=(r==='true'||r===true);
+      if(init)setTimeout(captureOpener,500); // snapshot opener state for disconnect detection
+      return init;
+    }catch(e){return false;}
+  }
+  function set(k,v){
+    try{if(api&&init)api.LMSSetValue(k,String(v));}
+    catch(e){notifyDisconnect();}
+  }
+  function get(k){
+    try{if(api&&init)return api.LMSGetValue(k)||'';}
+    catch(e){notifyDisconnect();}
+    return'';
+  }
+  function commit(){
+    try{
+      if(api&&init){
+        const r=api.LMSCommit('');
+        if(r==='false'||r===false){notifyDisconnect();return;}
+      }
+    }catch(e){notifyDisconnect();}
+  }
+  function finish(){try{if(api&&init)api.LMSFinish('');}catch(e){}}
+  // Snapshot opener accessibility at startup — detect changes, not absolutes
+  let _openerApiAtStart=null; // reference to API object found at init
+  function captureOpener(){
+    try{
+      if(window.opener&&!window.opener.closed){
+        // Cache whether opener.API is accessible — works regardless of same/cross-origin
+        // as long as the API lives on the opener (popup SCO pattern)
+        _openerApiAtStart=window.opener.API||null;
+        if(typeof dbgLog_==='function')
+          dbgLog_('info','captureOpener','opener.API '+(api?'found':'not found'));
+      } else {
+        if(typeof dbgLog_==='function')
+          dbgLog_('info','captureOpener','no opener at startup');
+      }
+    }catch(e){
+      if(typeof dbgLog_==='function')
+        dbgLog_('info','captureOpener','opener not accessible: '+e.message);
+    }
+  }
+  function probe(){
+    if(!api||!init)return;
+
+    // Signal 1 — SCORM spec: LMSGetLastError() must return 0 when healthy.
+    // Non-zero (101=general exception, 301=not initialized) = session problem.
+    try{
+      const r=api.LMSCommit('');
+      if(r===false||r==='false'){
+        if(typeof dbgLog_==='function')dbgLog_('err','probe','LMSCommit returned false');
+        notifyDisconnect();return;
+      }
+      if(api.LMSGetLastError){
+        const code=String(api.LMSGetLastError());
+        if(typeof dbgLog_==='function')dbgLog_('info','probe','LMSCommit ok, errCode='+code);
+        if(code!=='0'&&code!==''){
+          if(typeof dbgLog_==='function')dbgLog_('err','probe','non-zero error code: '+code);
+          notifyDisconnect();return;
+        }
+      } else {
+        if(typeof dbgLog_==='function')dbgLog_('info','probe','LMSCommit ok (no LMSGetLastError)');
+      }
+    }catch(e){
+      if(typeof dbgLog_==='function')dbgLog_('err','probe','LMSCommit threw: '+e.message);
+      notifyDisconnect();return;
+    }
+
+    // Signal 2 — Opener closed or missing (popup SCO pattern).
+    // If the API was found on opener at startup and opener is now gone, session ended.
+    if(_openerApiAtStart){
+      try{
+        if(!window.opener||window.opener.closed){
+          if(typeof dbgLog_==='function')dbgLog_('err','probe','opener closed');
+          notifyDisconnect();return;
+        }
+        // If API reference on opener is no longer reachable, session ended
+        const currentOpenerApi=window.opener.API;
+        if(!currentOpenerApi){
+          if(typeof dbgLog_==='function')dbgLog_('err','probe','opener.API gone');
+          notifyDisconnect();return;
+        }
+        if(typeof dbgLog_==='function')dbgLog_('info','probe','opener.API still present');
+      }catch(e){
+        // SecurityError = opener navigated cross-origin = session ended
+        if(typeof dbgLog_==='function')dbgLog_('err','probe','opener.API threw SecurityError: '+e.message);
+        notifyDisconnect();return;
+      }
+    }
+
+    // Signal 3 — LMSGetValue sanity check: reading a known field should
+    // always return a non-null value on an active session.
+    try{
+      const val=api.LMSGetValue('cmi.core.lesson_status');
+      if(typeof dbgLog_==='function')dbgLog_('info','probe','lesson_status='+val);
+      if(val===null||val===undefined){
+        if(typeof dbgLog_==='function')dbgLog_('err','probe','LMSGetValue returned null/undefined');
+        notifyDisconnect();
+      }
+    }catch(e){
+      if(typeof dbgLog_==='function')dbgLog_('err','probe','LMSGetValue threw: '+e.message);
+      notifyDisconnect();
+    }
+  }
+  return{start,set,get,commit,finish,probe};
+})();
+
+// ── Runtime config (loaded from config.xml; baked-in values are fallbacks) ──
+const CFG={
+  threshold:1,
+  allowSelfComplete:false,
+  enableAck:false,
+  ackText:"I confirm that I have watched this video and understand its content.",
+  ackBtnLabel:"Acknowledge",
+  ccDefaultOn:false,
+  theme:"clean",
+  links:[]
+};
+function _esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function applyConfigToUI(){
+  // Threshold
+  THRESH=CFG.threshold;
+  const ndEl=document.getElementById('nd');
+  if(ndEl)ndEl.textContent=Math.round(CFG.threshold*100)+'%';
+  // Banner text
+  const bnTitleEl=document.getElementById('bnTitle');
+  const bnSubEl=document.getElementById('bnSub');
+  if(bnTitleEl)bnTitleEl.textContent=CFG.enableAck?'Acknowledgement required':'Completion recorded';
+  if(bnSubEl)bnSubEl.textContent=CFG.enableAck
+    ?'You have watched enough — please click Exit to acknowledge and send your completion to the Learning Management System'
+    :Math.round(CFG.threshold*100)+'% threshold reached — Learning Management System notified';
+  // Self-complete button
+  const scBtn=document.getElementById('selfCompleteBtn');
+  if(scBtn&&!CFG.allowSelfComplete)scBtn.style.display='none';
+  // Ack overlay content
+  const ackBodyEl=document.getElementById('ackModalBody');
+  if(ackBodyEl)ackBodyEl.textContent=CFG.ackText;
+  const ackConfirmBtnEl=document.getElementById('ackConfirmBtn');
+  if(ackConfirmBtnEl)ackConfirmBtnEl.textContent=CFG.ackBtnLabel;
+  if(!CFG.enableAck)ackConfirmed=true;
+  // Theme (prefer saved, then config)
+  const savedTh=(()=>{try{return localStorage.getItem('scorm_player_theme');}catch(e){return null;}})();
+  const startTh=savedTh&&THEMES[savedTh]?savedTh:CFG.theme;
+  if(THEMES[startTh])applyTheme(startTh);
+  else{document.querySelectorAll('.thopt').forEach(b=>b.classList.toggle('active',b.dataset.th===startTh));}
+  // Title
+  if(CFG.title){document.title=CFG.title;const h=document.querySelector('.hdr h1');if(h)h.textContent=CFG.title;}
+  // Description
+  const descEl=document.getElementById('coursedesc');
+  if(descEl&&CFG.description){descEl.textContent=CFG.description;descEl.style.display='';}
+  // External links
+  const er=document.getElementById('extResources');
+  const ll=document.getElementById('extLinkList');
+  if(er&&ll&&CFG.links&&CFG.links.length){
+    ll.innerHTML=CFG.links.map((l,i)=>`<button class="ext-link-item" data-url="${_esc(l.url)}" data-idx="${i}"><span class="ext-link-title">${_esc(l.title||'')}</span><span class="ext-link-arrow">&#8599;</span></button>`).join('');
+    er.style.display='';
+    ll.querySelectorAll('.ext-link-item[data-url]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const pw2=Math.round(screen.width*2/3),ph2=Math.round(screen.height*2/3);
+        const ww=window.open(btn.dataset.url,'_blank','noopener,noreferrer,width='+pw2+',height='+ph2);
+        try{if(ww)ww.focus();}catch(e){}
+      });
+    });
+  }
+}
+const configReady=fetch('config.xml')
+  .then(r=>{if(!r.ok)return;return r.text();})
+  .then(xml=>{
+    if(!xml)return;
+    try{
+      const xdoc=new DOMParser().parseFromString(xml,'application/xml');
+      if(xdoc.querySelector('parsererror'))return;
+      const g=sel=>{const el=xdoc.querySelector(sel);return el?el.textContent.trim():null;};
+      const thr=g('threshold');if(thr!==null){const n=parseFloat(thr);if(!isNaN(n))CFG.threshold=n/100;}
+      const asc=g('allow-self-complete');if(asc!==null)CFG.allowSelfComplete=asc!=='false';
+      const ccd=g('cc-default-on');if(ccd!==null)CFG.ccDefaultOn=ccd==='true';
+      const ackEl=xdoc.querySelector('acknowledgment');
+      if(ackEl){
+        CFG.enableAck=ackEl.getAttribute('enabled')==='true';
+        const at=g('acknowledgment text');if(at)CFG.ackText=at;
+        const ab=g('acknowledgment button-label');if(ab)CFG.ackBtnLabel=ab;
+      }
+      const th=g('theme');if(th&&THEMES[th])CFG.theme=th;
+      const ttl=g('title');if(ttl)CFG.title=ttl;
+      const dsc=g('description');if(dsc)CFG.description=dsc;
+      const lnkEls=[...xdoc.querySelectorAll('links link')];
+      if(lnkEls.length)CFG.links=lnkEls.map(l=>({title:l.getAttribute('label')||l.textContent.trim(),url:l.getAttribute('url')||''}));
+    }catch(e){}
+  })
+  .catch(()=>{});
+
+// ── State ──────────────────────────────────────────────────────────────────
+let THRESH=1, GRAN=0.5;
+let dur=0, buckets=[], done=false, ackConfirmed=false, lmsOk=false, resumeTime=0, probeIntervalId=0;
+
+
+function onLmsDisconnect(){
+  if(!lmsOk)return; // already flagged
+  dbgLog_('err','DISCONNECT','Session lost — warning shown');
+  lmsOk=false;
+  clearInterval(probeIntervalId);
+  const wb=document.getElementById('wb');
+  if(wb)wb.classList.add('on');
+  const dt=document.getElementById('dt');
+  if(dt)dt.className='dot err';
+  const dl=document.getElementById('dl');
+  if(dl)dl.textContent='Learning Management System connection lost';
+}
+
+const vid=document.getElementById('vid');
+const sw=document.getElementById('sw');
+const sc=document.getElementById('sc');
+const th=document.getElementById('th');
+const pb=document.getElementById('pb');
+const td=document.getElementById('td');
+const pw=document.getElementById('pw');
+const sv=document.getElementById('sv');
+const bn=document.getElementById('bn');
+const rb=document.getElementById('rb');
+const rsub=document.getElementById('rsub');
+const resumeBtn=document.getElementById('resumeBtn');
+const dt=document.getElementById('dt');
+const dl=document.getElementById('dl');
+const vs=document.getElementById('vs');
+const mb=document.getElementById('mb');
+const ctx=sc.getContext('2d');
+const exitBtn=document.getElementById('exitBtn');
+const exitOverlay=document.getElementById('exitOverlay');
+const cancelExitBtn=document.getElementById('cancelExitBtn');
+const confirmExitBtn=document.getElementById('confirmExitBtn');
+const exitModalBody=document.getElementById('exitModalBody');
+
+// ── Bookmark helpers ───────────────────────────────────────────────────────
+// SCORM 1.2 bookmark = cmi.core.lesson_location (string, max 255 chars)
+// We store JSON: { t: currentTime, b: base64-encoded bit-array of buckets }
+// If no LMS, fall back to sessionStorage so standalone preview still works.
+
+function encodeBookmark(){
+  // Pack buckets into a compact binary string then base64
+  const bytes=[];
+  for(let i=0;i<buckets.length;i+=8){
+    let byte=0;
+    for(let j=0;j<8;j++) if(buckets[i+j]) byte|=(1<<j);
+    bytes.push(byte);
+  }
+  const b64=btoa(String.fromCharCode(...bytes));
+  return JSON.stringify({t:Math.floor(vid.currentTime),b:b64,n:buckets.length});
+}
+
+function decodeBookmark(str){
+  try{
+    const obj=JSON.parse(str);
+    if(typeof obj.t!=='number')return null;
+    const raw=atob(obj.b);
+    const bk=[];
+    for(let i=0;i<obj.n;i++){
+      const byteIdx=Math.floor(i/8);
+      bk.push(!!(raw.charCodeAt(byteIdx)&(1<<(i%8))));
+    }
+    return{time:obj.t,buckets:bk};
+  }catch(e){return null;}
+}
+
+function saveBookmark(){
+  const bm=encodeBookmark();
+  if(lmsOk){
+    SCORM.set('cmi.suspend_data',bm);
+    SCORM.commit();
+  } else {
+    try{sessionStorage.setItem('scorm_bm',bm);}catch(e){}
+  }
+}
+
+function loadBookmark(){
+  let raw='';
+  if(lmsOk){
+    raw=SCORM.get('cmi.suspend_data');
+  } else {
+    try{raw=sessionStorage.getItem('scorm_bm')||'';}catch(e){}
+  }
+  if(!raw)return null;
+  return decodeBookmark(raw);
+}
+
+// ── LMS init & bookmark restore ───────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',async ()=>{
+  await configReady;
+  applyConfigToUI();
+  lmsOk=SCORM.start();
+  if(lmsOk){
+    dt.className='dot ok';
+    dl.textContent='Learning Management System connected';
+    dbgLog_('in','LMSInitialize','init=true — connected');
+    // Read previous lesson_status — if already passed, restore that state
+    const prevStatus=SCORM.get('cmi.core.lesson_status');
+    if(prevStatus==='passed'||prevStatus==='completed'){
+      done=true;
+    } else {
+      SCORM.set('cmi.core.lesson_status','incomplete');
+      SCORM.commit();
+    }
+    // Active heartbeat: probe the LMS every 5 seconds to detect session loss
+    // Poll every 2s — same-origin popup means opener.location is directly readable
+    probeIntervalId=setInterval(()=>{ if(lmsOk)SCORM.probe(); }, 2000);
+  } else {
+    dt.className='dot err';
+    dl.textContent='No Learning Management System detected (standalone)';
+    dbgLog_('info','LMSInitialize','no API found — standalone mode');
+  }
+});
+
+// Restore bookmark once video metadata is available
+vid.addEventListener('loadedmetadata',()=>{
+  dur=vid.duration;
+  buckets=new Array(Math.ceil(dur/GRAN)).fill(false);
+  lastMarkTime=0;
+  resize();
+  updateThumb();
+  // Show idle play icon until the user first starts playback
+  playFlash.innerHTML='&#9654;';
+  playFlash.classList.add('idle');
+
+  const bm=loadBookmark();
+  if(bm&&bm.time>1){
+    let pct=0;
+    if(bm.buckets.length===buckets.length){
+      // Bucket count matches — restore position and watched segments
+      buckets=bm.buckets.slice();
+      resumeTime=bm.time;
+      vid.currentTime=bm.time;
+      pct=Math.round((bm.buckets.filter(Boolean).length/buckets.length)*100);
+      rsub.textContent='Position '+ft(bm.time)+' — '+pct+'% previously watched';
+      rb.classList.add('on');
+    } else {
+      // Bucket count mismatch — start from beginning, no resume banner
+      resumeTime=0;
+      vid.currentTime=0;
+    }
+    // If they were already complete, restore that display
+    if(done||pct>=Math.round(THRESH*100)){
+      done=true;
+      sv.textContent='Complete';sv.className='sval done';
+      bn.classList.add('on');
+    }
+    updateStats();
+    draw();
+  }
+});
+
+resumeBtn.addEventListener('click',()=>{
+  vid.currentTime=resumeTime;
+  rb.classList.remove('on');
+  vid.play();
+});
+
+// Auto-save bookmark every 10 seconds while playing
+setInterval(()=>{if(!vid.paused&&dur>0)saveBookmark();},5000);
+
+// ── Exit flow ──────────────────────────────────────────────────────────────
+function doExit(){
+  vid.pause();
+  saveBookmark();
+  if(lmsOk){
+    if(!done||!ackConfirmed)SCORM.set('cmi.core.lesson_status','incomplete');
+    SCORM.commit();
+    SCORM.finish();
+    dl.textContent='Progress saved. Closing…';
+    setTimeout(()=>{
+      try{window.close();}catch(e){}
+      dl.textContent='Progress saved ✓ — you may close this window.';
+    },300);
+  } else {
+    dl.textContent='Progress saved ✓';
+    setTimeout(()=>{ dl.textContent='No Learning Management System detected (standalone)'; },2500);
+  }
+}
+
+const ackOverlay=document.getElementById('ackOverlay');
+const ackConfirmBtn=document.getElementById('ackConfirmBtn');
+const ackDeclineBtn=document.getElementById('ackDeclineBtn');
+
+exitBtn.addEventListener('click',()=>{
+  vid.pause();
+  if(done&&CFG.enableAck&&ackOverlay){
+    ackOverlay.classList.add('on');
+  } else {
+    exitModalBody.textContent=done
+      ?'Your completion has been recorded. Your position will be saved if you want to rewatch.'
+      :'Your progress will be saved and you can resume from where you left off next time.';
+    exitOverlay.classList.add('on');
+  }
+});
+
+if(ackConfirmBtn){
+  ackConfirmBtn.addEventListener('click',()=>{
+    ackOverlay.classList.remove('on');
+    if(lmsOk&&done){
+      SCORM.set('cmi.core.lesson_status','passed');
+      SCORM.set('cmi.core.score.raw','100');
+      SCORM.set('cmi.core.score.min','0');
+      SCORM.set('cmi.core.score.max','100');
+      SCORM.commit();
+      dl.textContent='Completion sent to Learning Management System ✓';
+    }
+    ackConfirmed=true;
+    // Update banner to reflect that completion is now recorded
+    const bnTitle=document.getElementById('bnTitle');
+    const bnSub=document.getElementById('bnSub');
+    if(bnTitle)bnTitle.textContent='Completion recorded';
+    if(bnSub)bnSub.textContent=Math.round(THRESH*100)+'% threshold reached — Learning Management System notified';
+    doExit();
+  });
+}
+if(ackDeclineBtn){
+  ackDeclineBtn.addEventListener('click',()=>{
+    ackOverlay.classList.remove('on');
+    vid.play();
+  });
+}
+
+cancelExitBtn.addEventListener('click',()=>{
+  exitOverlay.classList.remove('on');
+  vid.play();
+});
+
+confirmExitBtn.addEventListener('click',()=>{
+  exitOverlay.classList.remove('on');
+  doExit();
+});
+
+// Also handle browser/LMS-driven unload (tab close, LMS navigation)
+window.addEventListener('beforeunload',()=>{
+  if(dur>0)saveBookmark();
+  if(lmsOk){if(!done||!ackConfirmed)SCORM.set('cmi.core.lesson_status','incomplete');SCORM.commit();SCORM.finish();}
+});
+
+// ── Canvas seekbar ─────────────────────────────────────────────────────────
+function resize(){sc.width=sw.offsetWidth;sc.height=sw.offsetHeight;draw();}
+new ResizeObserver(resize).observe(sw);
+
+function draw(){
+  const W=sc.width,H=sc.height;
+  const cs=getComputedStyle(document.documentElement);
+  const clrWatched=cs.getPropertyValue('--watched').trim()||'#86efac';
+  const clrBg=cs.getPropertyValue('--surface2').trim()||'#1e1e2d';
+  ctx.clearRect(0,0,W,H);
+  if(!buckets.length){
+    ctx.fillStyle=clrBg;rr(ctx,0,0,W,H,H/2);ctx.fill();return;
+  }
+  const bw=W/buckets.length;
+  for(let i=0;i<buckets.length;i++){
+    ctx.fillStyle=buckets[i]?clrWatched:clrBg;
+    ctx.fillRect(i*bw,0,bw+0.5,H);
+  }
+
+  ctx.globalCompositeOperation='destination-in';
+  rr(ctx,0,0,W,H,H/2);ctx.fill();
+  ctx.globalCompositeOperation='source-over';
+}
+
+function rr(c,x,y,w,h,r){
+  c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);
+  c.arcTo(x+w,y,x+w,y+h,r);c.lineTo(x+w,y+h-r);
+  c.arcTo(x+w,y+h,x,y+h,r);c.lineTo(x+r,y+h);
+  c.arcTo(x,y+h,x,y,r);c.lineTo(x,y+r);
+  c.arcTo(x,y,x+w,y,r);c.closePath();
+}
+
+// ── Video events ───────────────────────────────────────────────────────────
+vid.addEventListener('timeupdate',()=>{mark();updateThumb();draw();updateStats();updateTime();});
+vid.addEventListener('play',()=>{pb.innerHTML='';pb.classList.add('playing');document.getElementById('xb').classList.remove('on');rb.classList.remove('on');playFlash.classList.remove('idle');});
+vid.addEventListener('pause',()=>{pb.classList.remove('playing');pb.innerHTML='&#9654;';});
+// ── Self-complete button ──────────────────────────────────────────────────
+const selfCompleteBtn=document.getElementById('selfCompleteBtn');
+if(selfCompleteBtn){
+  // Show the button once playback has started (not immediately on load), but only if enabled
+  vid.addEventListener('play',()=>{
+    if(!done&&CFG.allowSelfComplete)selfCompleteBtn.classList.add('visible');
+  },{once:true});
+  selfCompleteBtn.addEventListener('click',()=>{
+    if(done)return;
+    if(!confirm('Mark this module as complete? Your current progress will be saved.'))return;
+    done=true;
+    selfCompleteBtn.classList.remove('visible');
+    sv.textContent='Complete';sv.className='sval done';
+    bn.classList.add('on');
+    if(!CFG.enableAck){const s=document.getElementById('bnSub');if(s)s.textContent='Marked complete manually';}
+    document.getElementById('xb').classList.remove('on');
+    if(lmsOk&&!CFG.enableAck){
+      SCORM.set('cmi.core.lesson_status','passed');
+      SCORM.set('cmi.core.score.raw','100');
+      SCORM.set('cmi.core.score.min','0');
+      SCORM.set('cmi.core.score.max','100');
+      SCORM.commit();
+      dl.textContent='Completion sent to Learning Management System ✓';
+    } else if(lmsOk&&CFG.enableAck){
+      dl.textContent='Completion pending — acknowledgement required before reporting to Learning Management System';
+    }
+  });
+}
+
+function firstGapTime(){
+  // Find the first unwatched bucket and return its start time in seconds
+  for(let i=0;i<buckets.length;i++){
+    if(!buckets[i])return i*GRAN;
+  }
+  return 0;
+}
+
+document.getElementById('goToGapBtn').addEventListener('click',()=>{
+  const t=firstGapTime();
+  vid.currentTime=t;
+  vid.play();
+});
+
+vid.addEventListener('ended',()=>{
+  mark();updateStats();saveBookmark();
+  // If video ended but threshold not yet met, show the incomplete nudge
+  if(!done){
+    const pct=Math.round(frac()*100);
+    const needed=Math.round(THRESH*100);
+    document.getElementById('xsub').textContent=
+      'You have watched '+pct+'% — rewind and watch the remaining sections to reach '+needed+'%';
+    document.getElementById('xb').classList.add('on');
+    // Update gap button label with the timestamp of the first gap
+    const gapT=firstGapTime();
+    document.getElementById('goToGapBtn').textContent='◄ Go to '+ft(gapT);
+  }
+});
+
+let lastMarkTime=0;
+function mark(){
+  if(!dur||drag||isSeeking)return;  // don't mark while scrubbing or seeking
+  const now=vid.currentTime;
+  // Guard: if time jumped by more than 2s it's an undetected seek (common with
+  // native fullscreen controls where the seeking event can arrive late). Reset
+  // the fill origin to the new position without marking the skipped range.
+  if(Math.abs(now-lastMarkTime)>2){lastMarkTime=now;return;}
+  const from=Math.floor(lastMarkTime/GRAN);
+  const to=Math.floor(now/GRAN);
+  const lo=Math.max(0,Math.min(from,to));
+  const hi=Math.min(buckets.length-1,Math.max(from,to));
+  for(let i=lo;i<=hi;i++)buckets[i]=true;
+  lastMarkTime=now;
+}
+
+function frac(){return buckets.length?buckets.filter(Boolean).length/buckets.length:0;}
+
+function updateStats(){
+  const f=frac(),p=Math.round(f*100);
+  pw.textContent=p+'%';
+  pw.className='sval'+(f>=THRESH?' done':'');
+  if(f>=THRESH&&!done){
+    done=true;sv.textContent='Complete';sv.className='sval done';
+    bn.classList.add('on');
+    if(lmsOk&&!CFG.enableAck){
+      SCORM.set('cmi.core.lesson_status','passed');
+      SCORM.set('cmi.core.score.raw','100');
+      SCORM.set('cmi.core.score.min','0');
+      SCORM.set('cmi.core.score.max','100');
+      SCORM.commit();
+      dl.textContent='Completion sent to Learning Management System ✓';
+    } else if(lmsOk&&CFG.enableAck){
+      dl.textContent='Completion pending — acknowledgement required before reporting to Learning Management System';
+    }
+  }
+}
+
+function updateTime(){td.textContent=ft(vid.currentTime)+' / '+ft(dur);}
+function ft(s){
+  if(isNaN(s))return'0:00';
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=Math.floor(s%60);
+  if(dur>=3600||h>0)return h+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+  return m+':'+String(sec).padStart(2,'0');
+}
+function updateThumb(){
+  if(!dur)return;
+  // Clamp to [0,100] so thumb stays fully inside seekwrap at start and end
+  const pct=Math.max(0,Math.min(100,vid.currentTime/dur*100));
+  th.style.left=pct+'%';
+}
+
+// ── Seekbar drag ───────────────────────────────────────────────────────────
+let drag=false, isSeeking=false;
+function seekTo(e){const r=sw.getBoundingClientRect();vid.currentTime=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*dur;}
+sw.addEventListener('mousedown',e=>{drag=true;seekTo(e);});
+document.addEventListener('mousemove',e=>{if(drag)seekTo(e);});
+document.addEventListener('mouseup',()=>{drag=false;});
+
+// ── Seekbar tooltip ───────────────────────────────────────────────────────
+const seekTip=document.getElementById('seekTip');
+sw.addEventListener('mousemove',e=>{
+  if(!dur)return;
+  const r=sw.getBoundingClientRect();
+  const frac=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+  seekTip.textContent=ft(frac*dur);
+  // Position tooltip centred on cursor, clamped to stay within seekwrap
+  const tipW=seekTip.offsetWidth;
+  const rawLeft=e.clientX-r.left;
+  const clampedLeft=Math.max(tipW/2,Math.min(r.width-tipW/2,rawLeft));
+  seekTip.style.left=clampedLeft+'px';
+});
+
+// ── Rewind 5 seconds ──────────────────────────────────────────────────────
+document.getElementById('rwb').addEventListener('click',()=>{
+  vid.currentTime=Math.max(0,vid.currentTime-5);
+});
+// Reset fill-forward origin after any seek so skipping doesn't mark unvisited buckets
+vid.addEventListener('seeking',()=>{isSeeking=true;});
+vid.addEventListener('seeked',()=>{isSeeking=false;lastMarkTime=vid.currentTime;});
+sw.addEventListener('touchstart',e=>seekTo(e.touches[0]),{passive:true});
+sw.addEventListener('touchmove',e=>seekTo(e.touches[0]),{passive:true});
+
+// ── Controls ───────────────────────────────────────────────────────────────
+pb.addEventListener('click',()=>{vid.paused?vid.play():vid.pause();});
+
+// ── SCORM Debug Panel ─────────────────────────────────────────────────────
+const dbgPanel=document.getElementById('dbgPanel');
+const dbgLog=document.getElementById('dbgLog');
+let dbgEnabled=false;
+
+function dbgLog_(type,fn,detail){
+  const now=new Date();
+  const ts=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})
+    +'.'+String(now.getMilliseconds()).padStart(3,'0');
+  const row=document.createElement('div');
+  row.className='dbg-row '+type;
+  row.innerHTML='<span class="dbg-time">'+ts+'</span>'
+    +'<span class="dbg-fn">'+fn+'</span>'
+    +'<span>'+String(detail).replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</span>';
+  dbgLog.appendChild(row);
+  dbgLog.scrollTop=dbgLog.scrollHeight;
+}
+
+function dbgToggle(){
+  dbgEnabled=!dbgEnabled;
+  dbgPanel.classList.toggle('on',dbgEnabled);
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey&&e.shiftKey&&e.code==='Backquote'){e.preventDefault();dbgToggle();}
+});
+document.getElementById('dbgClose').addEventListener('click',()=>{
+  dbgEnabled=false;dbgPanel.classList.remove('on');
+});
+document.getElementById('dbgClear').addEventListener('click',()=>{
+  dbgLog.innerHTML='';
+});
+
+document.getElementById('dbgComplete').addEventListener('click',()=>{
+  if(!confirm('Force send completion to the LMS? This will mark the module as passed with a score of 100 regardless of watch progress.'))return;
+  dbgLog_('out','FORCE COMPLETE','Sending passed status to LMS...');
+  SCORM.set('cmi.core.lesson_status','passed');
+  SCORM.set('cmi.core.score.raw','100');
+  SCORM.set('cmi.core.score.min','0');
+  SCORM.set('cmi.core.score.max','100');
+  SCORM.commit();
+  // Also update UI to reflect completion
+  done=true;
+  sv.textContent='Complete';
+  sv.className='sval done';
+  bn.classList.add('on');
+  pw.textContent='100%';
+  pw.className='sval done';
+  dl.textContent='Completion sent to Learning Management System ✓';
+  dbgLog_('in','FORCE COMPLETE','Done — LMS updated');
+});
+
+// Wrap SCORM calls to intercept and log them
+const _origSet=SCORM.set.bind(SCORM);
+const _origGet=SCORM.get.bind(SCORM);
+const _origCommit=SCORM.commit.bind(SCORM);
+const _origFinish=SCORM.finish.bind(SCORM);
+
+SCORM.set=function(k,v){
+  dbgLog_('out','LMSSetValue',k+' = '+v);
+  _origSet(k,v);
+};
+SCORM.get=function(k){
+  const val=_origGet(k);
+  dbgLog_('in','LMSGetValue',k+' → '+val);
+  return val;
+};
+SCORM.commit=function(){
+  dbgLog_('out','LMSCommit','');
+  _origCommit();
+};
+SCORM.finish=function(){
+  dbgLog_('out','LMSFinish','');
+  _origFinish();
+};
+
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'&&e.target.tagName!=='INPUT'&&e.target.tagName!=='TEXTAREA'&&e.target.tagName!=='SELECT'&&e.target.tagName!=='BUTTON'){
+    e.preventDefault();
+    vid.paused?vid.play():vid.pause();
+  }
+});
+vs.addEventListener('input',()=>{vid.volume=vs.value;vid.muted=vid.volume===0;updateVol();});
+mb.addEventListener('click',()=>{vid.muted=!vid.muted;updateVol();});
+function updateVol(){mb.innerHTML=vid.muted||vid.volume===0?'&#128263;':vid.volume<0.5?'&#128265;':'&#128266;';}
+document.getElementById('fsb').addEventListener('click',()=>{
+  const shell=document.querySelector('.shell');
+  if(!document.fullscreenElement){
+    (shell.requestFullscreen||shell.webkitRequestFullscreen||shell.mozRequestFullScreen).call(shell);
+  }else{
+    (document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen).call(document);
+  }
+});
+
+// ── Theme switcher ────────────────────────────────────────────────────────
+const THEMES={
+  bmcd:{'--bg':'#001225','--surface':'#002D59','--surface2':'#003575','--border':'rgba(0,73,205,0.35)',
+    '--text':'#E8F4FF','--muted':'#80D3FF','--accent':'#0049CD','--ab':'#80D3FF',
+    '--watched':'#E6F001','--watched-dim':'rgba(230,240,1,0.10)',
+    '--exit':'#f87171','--exit-bg':'rgba(248,113,113,0.1)','--exit-border':'rgba(248,113,113,0.3)',
+    '--bookmark':'#80D3FF','--bookmark-bg':'rgba(128,211,255,0.1)',
+    '--mono':"'Aptos','Segoe UI',system-ui,sans-serif",'--sans':"'Aptos','Segoe UI',system-ui,sans-serif",
+    '--hover':'#003f8a','--watched-border':'rgba(230,240,1,0.45)','--watched-sub':'rgba(230,240,1,0.6)',
+    '--overlay-bg':'#001e4a','--overlay-border':'rgba(0,73,205,0.5)',
+    '--tag-bg':'rgba(0,73,205,0.15)','--tag-border':'rgba(0,73,205,0.35)',
+    '--active-clr':'#80D3FF','--active-bg':'rgba(128,211,255,0.08)','--active-border':'rgba(128,211,255,0.5)',
+    '--sc-clr':'#E6F001','--sc-bg':'rgba(230,240,1,0.1)','--sc-border':'rgba(230,240,1,0.35)',
+    '--sc-hover-bg':'rgba(230,240,1,0.18)','--sc-hover-border':'rgba(230,240,1,0.6)',
+    '--exitbtn-clr':'#E6F001','--exitbtn-bg':'rgba(230,240,1,0.12)',
+    '--exitbtn-border':'rgba(230,240,1,0.5)','--exitbtn-shadow':'rgba(230,240,1,0.2)',
+    '--watched-num':'#E6F001','--warn-clr':'#80D3FF','--warn-bg':'rgba(128,211,255,0.08)',
+    '--warn-border':'rgba(128,211,255,0.35)','--warn-sub':'rgba(128,211,255,0.65)'},
+  a11y:{'--bg':'#ffffff','--surface':'#f5f6f8','--surface2':'#e0e3ea','--border':'#5b6271',
+    '--text':'#0c0d0f','--muted':'#3c4452','--accent':'#0050b3','--ab':'#0050b3',
+    '--watched':'#00622e','--watched-dim':'rgba(0,98,46,0.10)',
+    '--exit':'#b91c1c','--exit-bg':'rgba(185,28,28,0.08)','--exit-border':'rgba(185,28,28,0.40)',
+    '--bookmark':'#6b3a00','--bookmark-bg':'rgba(107,58,0,0.10)',
+    '--mono':"'Aptos','Segoe UI',system-ui,sans-serif",'--sans':"'Aptos','Segoe UI',system-ui,sans-serif",
+    '--hover':'#d3d7e2','--watched-border':'rgba(0,98,46,0.55)','--watched-sub':'rgba(0,98,46,0.75)',
+    '--overlay-bg':'#ffffff','--overlay-border':'#5b6271',
+    '--tag-bg':'rgba(0,80,179,0.10)','--tag-border':'rgba(0,80,179,0.45)',
+    '--active-clr':'#003a85','--active-bg':'rgba(0,80,179,0.12)','--active-border':'rgba(0,80,179,0.65)',
+    '--sc-clr':'#00622e','--sc-bg':'rgba(0,98,46,0.09)','--sc-border':'rgba(0,98,46,0.55)',
+    '--sc-hover-bg':'rgba(0,98,46,0.16)','--sc-hover-border':'rgba(0,98,46,0.75)',
+    '--exitbtn-clr':'#921b1b','--exitbtn-bg':'rgba(146,27,27,0.09)',
+    '--exitbtn-border':'rgba(146,27,27,0.50)','--exitbtn-shadow':'rgba(146,27,27,0.20)',
+    '--watched-num':'#00622e','--warn-clr':'#6b3a00','--warn-bg':'rgba(107,58,0,0.10)',
+    '--warn-border':'rgba(107,58,0,0.50)','--warn-sub':'rgba(107,58,0,0.75)'},
+  clean:{'--bg':'#f4f6fb','--surface':'#ffffff','--surface2':'#eef0f7','--border':'#dde2ed',
+    '--text':'#1c2540','--muted':'#64748b','--accent':'#2563eb','--ab':'#3b82f6',
+    '--watched':'#10b981','--watched-dim':'rgba(16,185,129,0.08)',
+    '--exit':'#ef4444','--exit-bg':'rgba(239,68,68,0.08)','--exit-border':'rgba(239,68,68,0.25)',
+    '--bookmark':'#b45309','--bookmark-bg':'rgba(180,83,9,0.08)',
+    '--mono':"'Aptos','Segoe UI',system-ui,sans-serif",'--sans':"'Aptos','Segoe UI',system-ui,sans-serif",
+    '--hover':'#e8ebf5','--watched-border':'rgba(16,185,129,0.35)','--watched-sub':'rgba(16,185,129,0.6)',
+    '--overlay-bg':'#ffffff','--overlay-border':'#dde2ed',
+    '--tag-bg':'rgba(37,99,235,0.08)','--tag-border':'rgba(37,99,235,0.2)',
+    '--active-clr':'#2563eb','--active-bg':'rgba(37,99,235,0.08)','--active-border':'rgba(37,99,235,0.25)',
+    '--sc-clr':'#059669','--sc-bg':'rgba(5,150,105,0.08)','--sc-border':'rgba(5,150,105,0.3)',
+    '--sc-hover-bg':'rgba(5,150,105,0.12)','--sc-hover-border':'rgba(5,150,105,0.5)',
+    '--exitbtn-clr':'#dc2626','--exitbtn-bg':'rgba(220,38,38,0.07)',
+    '--exitbtn-border':'rgba(220,38,38,0.28)','--exitbtn-shadow':'rgba(220,38,38,0.15)',
+    '--watched-num':'#059669','--warn-clr':'#b45309','--warn-bg':'rgba(180,83,9,0.08)',
+    '--warn-border':'rgba(180,83,9,0.35)','--warn-sub':'rgba(180,83,9,0.70)'},
+  techie:{'--bg':'#0d0d12','--surface':'#151520','--surface2':'#1e1e2d','--border':'#2b2b3e',
+    '--text':'#eeeef5','--muted':'#a0a0c0','--accent':'#5b6af0','--ab':'#7c8df5',
+    '--watched':'#86efac','--watched-dim':'rgba(134,239,172,0.12)',
+    '--exit':'#f87171','--exit-bg':'rgba(248,113,113,0.1)','--exit-border':'rgba(248,113,113,0.3)',
+    '--bookmark':'#facc15','--bookmark-bg':'rgba(250,204,21,0.1)',
+    '--mono':"'Courier New',monospace",'--sans':"'Segoe UI',system-ui,sans-serif",
+    '--hover':'#2a2a42','--watched-border':'rgba(74,222,128,0.4)','--watched-sub':'rgba(74,222,128,0.55)',
+    '--overlay-bg':'#1c1c2a','--overlay-border':'#3a3a55',
+    '--tag-bg':'rgba(91,106,240,0.12)','--tag-border':'rgba(91,106,240,0.25)',
+    '--active-clr':'#fde68a','--active-bg':'rgba(253,230,138,0.08)','--active-border':'rgba(253,230,138,0.5)',
+    '--sc-clr':'#86efac','--sc-bg':'rgba(134,239,172,0.1)','--sc-border':'rgba(134,239,172,0.35)',
+    '--sc-hover-bg':'rgba(134,239,172,0.2)','--sc-hover-border':'rgba(134,239,172,0.6)',
+    '--exitbtn-clr':'#fca5a5','--exitbtn-bg':'rgba(248,113,113,0.18)',
+    '--exitbtn-border':'rgba(248,113,113,0.55)','--exitbtn-shadow':'rgba(248,113,113,0.25)',
+    '--watched-num':'var(--text)','--warn-clr':'#facc15','--warn-bg':'rgba(250,204,21,0.08)',
+    '--warn-border':'rgba(250,204,21,0.35)','--warn-sub':'rgba(250,204,21,0.65)'},
+  hotdog:{
+    '--bg':'#FF0000','--surface':'#000000','--surface2':'#1a0000','--border':'#FFFF00',
+    '--text':'#FFFF00','--muted':'#FFA500','--accent':'#FFFF00','--ab':'#000000',
+    '--watched':'#FFFF00','--watched-dim':'rgba(255,255,0,0.15)',
+    '--exit':'#FFFF00','--exit-bg':'rgba(255,255,0,0.1)','--exit-border':'#FFFF00',
+    '--bookmark':'#FFA500','--bookmark-bg':'rgba(255,165,0,0.15)',
+    '--mono':"'Courier New',monospace",'--sans':"'Arial',sans-serif",
+    '--hover':'#8B0000','--watched-border':'rgba(255,255,0,0.7)','--watched-sub':'rgba(255,255,0,0.75)',
+    '--overlay-bg':'#000000','--overlay-border':'#FFFF00',
+    '--tag-bg':'rgba(255,255,0,0.15)','--tag-border':'#FFFF00',
+    '--active-clr':'#000000','--active-bg':'#FFFF00','--active-border':'#FFFF00',
+    '--sc-clr':'#FFFF00','--sc-bg':'rgba(255,255,0,0.12)','--sc-border':'#FFFF00',
+    '--sc-hover-bg':'rgba(255,255,0,0.22)','--sc-hover-border':'#FFFF00',
+    '--exitbtn-clr':'#FFFF00','--exitbtn-bg':'rgba(255,255,0,0.1)',
+    '--exitbtn-border':'#FFFF00','--exitbtn-shadow':'rgba(255,255,0,0.5)',
+    '--watched-num':'#FFFF00','--warn-clr':'#FFA500','--warn-bg':'rgba(255,165,0,0.15)',
+    '--warn-border':'rgba(255,165,0,0.70)','--warn-sub':'rgba(255,165,0,0.85)'}
+};
+let activeTheme='clean';
+function applyTheme(name){
+  const vars=THEMES[name];if(!vars)return;
+  Object.entries(vars).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));
+  document.querySelectorAll('.thopt').forEach(b=>b.classList.toggle('active',b.dataset.th===name));
+  activeTheme=name;
+  closePop();
+  draw();
+  try{localStorage.setItem('scorm_player_theme',name);}catch(e){}
+}
+function toggleThemePop(e){
+  const pop=document.getElementById('thpop');
+  if(!pop.classList.contains('open')){
+    const show=e&&e.ctrlKey;
+    document.querySelectorAll('.hotdog-opt,.hotdog-sep').forEach(el=>el.style.display=show?(el.classList.contains('hotdog-opt')?'flex':'block'):'none');
+  }
+  pop.classList.toggle('open');
+}
+function closePop(){document.getElementById('thpop').classList.remove('open');}
+document.addEventListener('click',function(e){
+  const tw=document.getElementById('themeWrap');
+  if(tw&&!tw.contains(e.target))closePop();
+});
+// Theme init is handled by applyConfigToUI() after config.xml loads.
+
+// ── Playback speed ────────────────────────────────────────────────────────
+const speedsel=document.getElementById('speedsel');
+speedsel.addEventListener('change',()=>{
+  const speed=parseFloat(speedsel.value);
+  vid.playbackRate=speed;
+  speedsel.classList.toggle('active',speed!==1);
+});
+// Re-apply speed after seeking (some browsers reset playbackRate)
+vid.addEventListener('ratechange',()=>{
+  const speed=parseFloat(speedsel.value);
+  if(vid.playbackRate!==speed)vid.playbackRate=speed;
+});
+
+// ── Captions — fetched at runtime from captions.vtt ──────────────────────
+const ccbtn=document.getElementById('ccbtn');
+const cctrack=document.getElementById('cctrack');
+const CC_DEFAULT_ON=CFG.ccDefaultOn;
+function enableCaptions(){
+  for(let i=0;i<vid.textTracks.length;i++)vid.textTracks[i].mode='showing';
+  if(ccbtn)ccbtn.classList.add('active');
+}
+function disableCaptions(){
+  for(let i=0;i<vid.textTracks.length;i++)vid.textTracks[i].mode='disabled';
+  if(ccbtn)ccbtn.classList.remove('active');
+}
+fetch('captions.vtt')
+  .then(r=>{if(!r.ok)throw new Error();return r.text();})
+  .then(vtt=>{
+    const blob=new Blob([vtt],{type:'text/vtt'});
+    cctrack.src=URL.createObjectURL(blob);
+    if(ccbtn)ccbtn.style.display='';
+    let ccInitDone=false;
+    function initCaptions(){
+      if(ccInitDone)return;
+      ccInitDone=true;
+      CC_DEFAULT_ON?enableCaptions():disableCaptions();
+    }
+    cctrack.addEventListener('load',initCaptions);
+    setTimeout(initCaptions,300);
+    if(ccbtn){
+      ccbtn.addEventListener('click',()=>{
+        ccInitDone=true;
+        const showing=vid.textTracks[0]&&vid.textTracks[0].mode==='showing';
+        showing?disableCaptions():enableCaptions();
+      });
+    }
+  })
+  .catch(()=>{}); // No captions.vtt present — CC button stays hidden
+
+
+// ── Click-to-play on video frame ───────────────────────────────────────────
+const vframe=document.getElementById('vframe');
+const playFlash=document.getElementById('playFlash');
+vframe.addEventListener('click',e=>{
+  if(e.target.closest('.controls'))return;
+  const wasPlaying=!vid.paused;
+  if(vid.paused){vid.play();}else{vid.pause();}
+  // Show the icon that reflects what just happened:
+  // started playing → show ▶, just paused → show ⏸
+  playFlash.innerHTML=wasPlaying?'&#9646;&#9646;':'&#9654;';
+  playFlash.classList.remove('pop');
+  void playFlash.offsetWidth;
+  playFlash.classList.add('pop');
+  setTimeout(()=>playFlash.classList.remove('pop'),400);
+});
+</script>
+</body>
+</html>
