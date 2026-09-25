@@ -4,7 +4,7 @@ A browser-based tool that wraps a video file into a SCORM 1.2 package ready to u
 
 ## How to use it
 
-1. **Open** `scorm_video_builder4.html` in your local browser (do not open from a network drive or SharePoint — it must be a local file).
+1. **Open** `scorm_video_builder4-non-branded.html` in your local browser (do not open from a network drive or SharePoint — it must be a local file).
 2. **Fill in the fields:**
    - **Video file** — the .mp4 (or other format) you want to package
    - **Title & Description** — shown in the LMS course catalog
