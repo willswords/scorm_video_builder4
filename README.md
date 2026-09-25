@@ -1,4 +1,4 @@
-# SCORM Video Packager (Version 4)
+# SCORM Video Builder (Version 4)
 
 A browser-based tool that wraps a video file into a SCORM 1.2 package ready to upload to any compatible LMS (Cornerstone, Absorb, SABA, etc.).
 
