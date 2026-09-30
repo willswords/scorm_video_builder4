@@ -42,11 +42,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);
   border:1px solid var(--border);border-bottom:none;position:relative}
 video{display:block;width:100%;max-height:500px;object-fit:contain;background:#000}
 .shell:fullscreen,.shell:-webkit-full-screen,.shell:-moz-full-screen{
-  max-width:100%;width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
+  max-width:none;width:100vw;height:100%;display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
 .shell:fullscreen .vframe,.shell:-webkit-full-screen .vframe,.shell:-moz-full-screen .vframe{
-  flex:1;min-height:0;border-radius:0}
+  flex:1;min-height:0;border-radius:0;width:100%}
 .shell:fullscreen video,.shell:-webkit-full-screen video,.shell:-moz-full-screen video{
-  max-height:100%;height:100%}
+  max-height:100%;height:100%;width:100%}
+.shell:fullscreen .ext-resources,.shell:-webkit-full-screen .ext-resources,.shell:-moz-full-screen .ext-resources{display:none}
 .controls{background:var(--surface);border:1px solid var(--border);
   border-top:none;border-radius:0 0 8px 8px;padding:14px 16px 16px;
   display:flex;flex-direction:column;gap:12px}
@@ -245,28 +246,25 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
   transition:background .15s}
 .ext-link-item:last-child{border-bottom:none}
 .ext-link-item:hover{background:var(--surface2)}
-.ext-link-title{font-size:.82rem;color:var(--accent);font-weight:500;flex:1;
+.ext-link-title{font-size:.82rem;color:var(--ab);font-weight:500;flex:1;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ext-link-arrow{font-size:.7rem;color:var(--muted);flex-shrink:0;font-family:var(--mono)}
 </style>
 </head>
 <body>
 
-<!-- Exit confirmation modal -->
-<div class="overlay" id="exitOverlay">
-  <div class="modal">
-    <div class="modal-title">Exit course?</div>
-    <div class="modal-body" id="exitModalBody">Your progress will be saved and you can resume from where you left off next time.</div>
-    <div class="modal-actions">
-      <button class="mbtn mbtn-cancel" id="cancelExitBtn">Keep watching</button>
-      <button class="mbtn mbtn-exit" id="confirmExitBtn">Save &amp; exit</button>
+<div class="shell">
+  <div class="overlay" id="exitOverlay">
+    <div class="modal">
+      <div class="modal-title">Exit course?</div>
+      <div class="modal-body" id="exitModalBody">Your progress will be saved and you can resume from where you left off next time.</div>
+      <div class="modal-actions">
+        <button class="mbtn mbtn-cancel" id="cancelExitBtn">Keep watching</button>
+        <button class="mbtn mbtn-exit" id="confirmExitBtn">Save &amp; exit</button>
+      </div>
     </div>
   </div>
-</div>
-
-
-<div class="overlay" id="ackOverlay"><div class="modal"><div class="modal-title">Before you go</div><p class="ack-modal-body" id="ackModalBody">I confirm that I have watched this video and understand its content.</p><div class="modal-actions"><button class="mbtn mbtn-cancel" id="ackDeclineBtn">Cancel</button><button class="mbtn mbtn-exit" id="ackConfirmBtn">Acknowledge</button></div></div></div>
-<div class="shell">
+  <div class="overlay" id="ackOverlay"><div class="modal"><div class="modal-title">Before you go</div><p class="ack-modal-body" id="ackModalBody">I confirm that I have watched this video and understand its content.</p><div class="modal-actions"><button class="mbtn mbtn-cancel" id="ackDeclineBtn">Cancel</button><button class="mbtn mbtn-exit" id="ackConfirmBtn">Acknowledge</button></div></div></div>
   <div class="hdr">
     <h1>Video Course</h1>
     <button class="exitbtn" id="exitBtn">&#x2715; Exit</button>
@@ -1104,6 +1102,29 @@ document.getElementById('fsb').addEventListener('click',()=>{
     (document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen).call(document);
   }
 });
+(function(){
+  const shell=document.querySelector('.shell');
+  const vframe=document.querySelector('.vframe');
+  function onFSChange(){
+    const isFS=!!(document.fullscreenElement||document.webkitFullscreenElement);
+    shell.style.maxWidth=isFS?'none':'';
+    shell.style.width=isFS?'100vw':'';
+    shell.style.height=isFS?'100vh':'';
+    shell.style.overflow=isFS?'hidden':'';
+    vframe.style.flex=isFS?'1':'';
+    vframe.style.minHeight=isFS?'0':'';
+    vframe.style.borderRadius=isFS?'0':'';
+    vframe.style.width=isFS?'100%':'';
+    vid.style.maxHeight=isFS?'100%':'';
+    vid.style.height=isFS?'100%':'';
+    vid.style.width=isFS?'100%':'';
+    const er=document.getElementById('extResources');
+    if(er)er.style.display=isFS?'none':'';
+  }
+  document.addEventListener('fullscreenchange',onFSChange);
+  document.addEventListener('webkitfullscreenchange',onFSChange);
+  document.addEventListener('mozfullscreenchange',onFSChange);
+})();
 
 // ── Theme switcher ────────────────────────────────────────────────────────
 const THEMES={
