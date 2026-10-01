@@ -1277,7 +1277,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);
 .exitbtn:hover{filter:brightness(1.15);box-shadow:0 0 12px var(--exitbtn-shadow)}
 .vframe{background:#000;border-radius:8px 8px 0 0;overflow:hidden;
   border:1px solid var(--border);border-bottom:none;position:relative}
-video{display:block;width:100%;max-height:500px;object-fit:contain;background:#000}
+video{display:block;width:100%;max-height:500px;object-fit:contain;background:#000;aspect-ratio:16/9}
 .shell:fullscreen,.shell:-webkit-full-screen,.shell:-moz-full-screen{
   max-width:none;width:100vw;height:100%;display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
 .shell:fullscreen .vframe,.shell:-webkit-full-screen .vframe,.shell:-moz-full-screen .vframe{
@@ -1299,6 +1299,11 @@ video{display:block;width:100%;max-height:500px;object-fit:contain;background:#0
 .seekwrap:hover .thumb{width:18px;height:18px}
 .seek-tooltip{position:absolute;bottom:calc(100% + 8px);background:var(--overlay-bg);border:1px solid var(--overlay-border);color:var(--text);font-family:var(--mono);font-size:.68rem;padding:3px 8px;border-radius:4px;pointer-events:none;white-space:nowrap;opacity:0;transition:opacity .1s;transform:translateX(-50%);z-index:10}
 .seekwrap:hover .seek-tooltip{opacity:1}
+.scrub-prev{position:absolute;bottom:calc(100% + 36px);width:192px;height:108px;
+  border-radius:6px;border:2px solid var(--border);background:#000;
+  pointer-events:none;transform:translateX(-50%);display:none;
+  box-shadow:0 4px 20px rgba(0,0,0,.6);z-index:10;clip-path:inset(0 round 6px)}
+.scrub-prev.on{display:block}
 .crow{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;min-width:0}
 .pbtn{width:38px;height:38px;background:var(--surface2);border:1px solid var(--border);
   color:var(--text);border-radius:50%;display:flex;align-items:center;
@@ -1519,6 +1524,7 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
       <canvas id="sc" class="seekcanvas"></canvas>
       <div class="thumb" id="th"></div>
       <div class="seek-tooltip" id="seekTip">0:00</div>
+      <canvas id="scrubPrev" class="scrub-prev" width="192" height="108"></canvas>
     </div>
     <div class="crow">
       <button class="pbtn" id="pb">&#9654;</button>
@@ -2214,10 +2220,28 @@ function updateThumb(){
 
 // ── Seekbar drag ───────────────────────────────────────────────────────────
 let drag=false, isSeeking=false;
-function seekTo(e){const r=sw.getBoundingClientRect();vid.currentTime=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*dur;}
-sw.addEventListener('mousedown',e=>{drag=true;seekTo(e);});
+const scrubPrev=document.getElementById('scrubPrev');
+function seekTo(e){
+  const r=sw.getBoundingClientRect();
+  const frac=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+  if(dur)vid.currentTime=frac*dur;
+  th.style.left=(frac*100)+'%';
+  if(drag&&scrubPrev){
+    const pw=192;
+    const px=frac*r.width;
+    scrubPrev.style.left=Math.max(pw/2,Math.min(r.width-pw/2,px))+'px';
+  }
+}
+sw.addEventListener('mousedown',e=>{
+  drag=true;
+  if(scrubPrev)scrubPrev.classList.add('on');
+  seekTo(e);
+});
 document.addEventListener('mousemove',e=>{if(drag)seekTo(e);});
-document.addEventListener('mouseup',()=>{drag=false;});
+document.addEventListener('mouseup',()=>{
+  drag=false;
+  if(scrubPrev)scrubPrev.classList.remove('on');
+});
 
 // ── Seekbar tooltip ───────────────────────────────────────────────────────
 const seekTip=document.getElementById('seekTip');
@@ -2239,7 +2263,15 @@ document.getElementById('rwb').addEventListener('click',()=>{
 });
 // Reset fill-forward origin after any seek so skipping doesn't mark unvisited buckets
 vid.addEventListener('seeking',()=>{isSeeking=true;});
-vid.addEventListener('seeked',()=>{isSeeking=false;lastMarkTime=vid.currentTime;});
+vid.addEventListener('seeked',()=>{
+  isSeeking=false;lastMarkTime=vid.currentTime;
+  if(drag&&scrubPrev){
+    const vw=vid.videoWidth||192,vh=vid.videoHeight||108;
+    const scale=Math.min(192/vw,108/vh);
+    const dw=vw*scale,dh=vh*scale;
+    scrubPrev.getContext('2d').drawImage(vid,(192-dw)/2,(108-dh)/2,dw,dh);
+  }
+});
 sw.addEventListener('touchstart',e=>seekTo(e.touches[0]),{passive:true});
 sw.addEventListener('touchmove',e=>seekTo(e.touches[0]),{passive:true});
 
