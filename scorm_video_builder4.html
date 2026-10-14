@@ -17,7 +17,6 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SCORM Video Packager</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700&display=swap');
 
@@ -741,7 +740,7 @@
       <input type="checkbox" id="allowSelfComplete"/>
       <div class="field-check-label">
         <span class="field-check-title">Allow learner to mark themselves complete</span>
-        <span class="field-check-sub">Adds a button letting the learner send completion before reaching the watch threshold</span>
+        <span class="field-check-sub">Shows a button, from the moment the module opens, that lets the learner send completion before reaching the watch threshold</span>
       </div>
     </label>
     <label class="field-check">
@@ -829,6 +828,11 @@
 </div>
 
 <script>
+// Snapshot the page before any interaction so "save this page" produces a clean copy
+const PRISTINE_HTML = Array.from(document.childNodes).map(n =>
+  n.nodeType === Node.DOCUMENT_TYPE_NODE ? '<!DOCTYPE html>' :
+  n.nodeType === Node.COMMENT_NODE ? '<!--' + n.data + '-->' :
+  n.outerHTML || '').join('\n');
 const videoInput = document.getElementById('videoInput');
 const dropZone = document.getElementById('dropZone');
 const filePreview = document.getElementById('filePreview');
@@ -1185,6 +1189,8 @@ function buildPlayerHTML(title, videoFilename, vttContent, desc, threshold, allo
   const ackBtnLabelRaw = ackBtnLabel || 'Acknowledge';
   ackText = escHTML(ackTextRaw);
   ackBtnLabel = escHTML(ackBtnLabelRaw);
+  // JSON for embedding in the player's script block: escape "<" so a closing script tag in the text can't end it
+  const jsLit = v => JSON.stringify(v).replace(/</g, '\\u003c');
   const themeCss = theme === 'bmcd' ?
 `:root{
   --bg:#001225;--surface:#002D59;--surface2:#003575;--border:rgba(0,73,205,0.35);
@@ -1285,6 +1291,8 @@ video{display:block;width:100%;max-height:500px;object-fit:contain;background:#0
 .shell:fullscreen video,.shell:-webkit-full-screen video,.shell:-moz-full-screen video{
   max-height:100%;height:100%;width:100%}
 .shell:fullscreen .ext-resources,.shell:-webkit-full-screen .ext-resources,.shell:-moz-full-screen .ext-resources{display:none}
+.shell:fullscreen #bn,.shell:-webkit-full-screen #bn,.shell:-moz-full-screen #bn{display:none}
+.shell:fullscreen .lmsrow,.shell:-webkit-full-screen .lmsrow,.shell:-moz-full-screen .lmsrow{display:none}
 .controls{background:var(--surface);border:1px solid var(--border);
   border-top:none;border-radius:0 0 8px 8px;padding:14px 16px 16px;
   display:flex;flex-direction:column;gap:12px}
@@ -1319,7 +1327,8 @@ video{display:block;width:100%;max-height:500px;object-fit:contain;background:#0
 .timedisp{font-family:var(--mono);font-size:.72rem;color:var(--muted);
   letter-spacing:.04em;white-space:nowrap;flex-shrink:0}
 .vrow{display:flex;align-items:center;gap:8px}
-.vicon{cursor:pointer;user-select:none;font-size:.85rem}
+.vicon{cursor:pointer;user-select:none;font-size:.85rem;background:none;border:none;color:inherit;padding:0;line-height:1}
+button:focus-visible,select:focus-visible,input:focus-visible,.seekwrap:focus-visible{outline:2px solid var(--ab);outline-offset:2px}
 input[type=range].vslider{-webkit-appearance:none;width:70px;height:4px;
   background:var(--border);border-radius:2px;outline:none;cursor:pointer}
 input[type=range].vslider::-webkit-slider-thumb{-webkit-appearance:none;
@@ -1497,8 +1506,8 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
 
 <div class="shell">
   <div class="overlay" id="exitOverlay">
-    <div class="modal">
-      <div class="modal-title">Exit course?</div>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="exitTitle">
+      <div class="modal-title" id="exitTitle">Exit course?</div>
       <div class="modal-body" id="exitModalBody">Your progress will be saved and you can resume from where you left off next time.</div>
       <div class="modal-actions">
         <button class="mbtn mbtn-cancel" id="cancelExitBtn">Keep watching</button>
@@ -1506,37 +1515,50 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
       </div>
     </div>
   </div>
-  <div class="overlay" id="ackOverlay"><div class="modal"><div class="modal-title">Before you go</div><p class="ack-modal-body" id="ackModalBody">${ackText||'I confirm that I have watched this video and understand its content.'}</p><div class="modal-actions"><button class="mbtn mbtn-cancel" id="ackDeclineBtn">Cancel</button><button class="mbtn mbtn-exit" id="ackConfirmBtn">${ackBtnLabel||'Acknowledge'}</button></div></div></div>
+  <div class="overlay" id="scOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="scTitle">
+      <div class="modal-title" id="scTitle">Mark as complete?</div>
+      <div class="modal-body">This records the module as complete. Your current progress will be saved.</div>
+      <div class="modal-actions">
+        <button class="mbtn mbtn-cancel" id="scCancelBtn">Cancel</button>
+        <button class="mbtn mbtn-exit" id="scConfirmBtn">Mark complete</button>
+      </div>
+    </div>
+  </div>
+  <div class="overlay" id="ackOverlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="ackTitle"><div class="modal-title" id="ackTitle">Before you go</div><p class="ack-modal-body" id="ackModalBody">${ackText||'I confirm that I have watched this video and understand its content.'}</p><div class="modal-actions"><button class="mbtn mbtn-cancel" id="ackDeclineBtn">Cancel</button><button class="mbtn mbtn-exit" id="ackConfirmBtn">${ackBtnLabel||'Acknowledge'}</button></div></div></div>
   <div class="hdr">
     <h1>${title}</h1>
     <button class="exitbtn" id="exitBtn">&#x2715; Exit</button>
   </div>
   <p class="course-desc" id="coursedesc"${desc ? '' : ' style="display:none"'}>${desc}</p>
   <div class="vframe" id="vframe">
-    <div class="play-flash" id="playFlash">&#9654;</div>
+    <div class="play-flash" id="playFlash" aria-hidden="true">&#9654;</div>
     <video id="vid" preload="metadata">
       <source src="${videoFilename}" type="video/mp4"/>
       <track id="cctrack" kind="subtitles" label="Captions" src=""/>
     </video>
+    <video id="prevVid" preload="metadata" muted style="display:none">
+      <source src="${videoFilename}" type="video/mp4"/>
+    </video>
   </div>
   <div class="controls">
-    <div class="seekwrap" id="sw">
-      <canvas id="sc" class="seekcanvas"></canvas>
-      <div class="thumb" id="th"></div>
-      <div class="seek-tooltip" id="seekTip">0:00</div>
-      <canvas id="scrubPrev" class="scrub-prev" width="192" height="108"></canvas>
+    <div class="seekwrap" id="sw" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="0:00">
+      <canvas id="sc" class="seekcanvas" aria-hidden="true"></canvas>
+      <div class="thumb" id="th" aria-hidden="true"></div>
+      <div class="seek-tooltip" id="seekTip" aria-hidden="true">0:00</div>
+      <canvas id="scrubPrev" class="scrub-prev" width="192" height="108" aria-hidden="true"></canvas>
     </div>
     <div class="crow">
-      <button class="pbtn" id="pb">&#9654;</button>
-      <button class="rwbtn" id="rwb" title="Rewind 5 seconds">&#x2212;5</button>
+      <button class="pbtn" id="pb" aria-label="Play">&#9654;</button>
+      <button class="rwbtn" id="rwb" title="Rewind 5 seconds" aria-label="Rewind 5 seconds">&#x2212;5</button>
       <span class="timedisp" id="td">0:00 / 0:00</span>
       <div class="vrow">
-        <span class="vicon" id="mb">&#128266;</span>
-        <input type="range" class="vslider" id="vs" min="0" max="1" step="0.05" value="1"/>
+        <button class="vicon" id="mb" aria-label="Mute">&#128266;</button>
+        <input type="range" class="vslider" id="vs" min="0" max="1" step="0.05" value="1" aria-label="Volume"/>
       </div>
       <span style="flex:1"></span>
-      <button class="ccbtn" id="ccbtn" style="display:none">CC</button>
-      <select class="speedsel" id="speedsel" title="Playback speed">
+      <button class="ccbtn" id="ccbtn" style="display:none" aria-label="Captions" aria-pressed="false">CC</button>
+      <select class="speedsel" id="speedsel" title="Playback speed" aria-label="Playback speed">
         <option value="1" selected>1x</option>
         <option value="1.25">1.25x</option>
         <option value="1.5">1.5x</option>
@@ -1579,7 +1601,7 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
     <div class="stat"><span class="slbl">Status</span><span class="sval" id="sv">Incomplete</span></div>
   </div>
   <button class="selfcomplete" id="selfCompleteBtn">&#10003; Mark as complete</button>
-  <div class="banner" id="bn">
+  <div class="banner" id="bn" role="status">
     <span class="bico">&#10003;</span>
     <div>
       <div class="btxt" id="bnTitle">${enableAck ? 'Acknowledgement required' : 'Completion recorded'}</div>
@@ -1595,7 +1617,7 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
   </div>
   <div class="lmsrow">
     <div class="dot" id="dt"></div>
-    <span class="dlbl" id="dl">Initializing Learning Management System&hellip;</span>
+    <span class="dlbl" id="dl" aria-live="polite">Initializing Learning Management System&hellip;</span>
   </div>
   <div class="ext-resources" id="extResources" style="display:none">
     <div class="ext-resources-hdr">
@@ -1658,7 +1680,7 @@ const SCORM=(()=>{
       }
     }catch(e){notifyDisconnect();}
   }
-  function finish(){try{if(api&&init)api.LMSFinish('');}catch(e){}}
+  function finish(){try{if(api&&init)api.LMSFinish('');}catch(e){}init=false;}
   // Snapshot opener accessibility at startup — detect changes, not absolutes
   let _openerApiAtStart=null; // reference to API object found at init
   function captureOpener(){
@@ -1748,11 +1770,11 @@ const CFG={
   threshold:${threshold},
   allowSelfComplete:${allowSelfComplete?'true':'false'},
   enableAck:${enableAck?'true':'false'},
-  ackText:${JSON.stringify(ackTextRaw)},
-  ackBtnLabel:${JSON.stringify(ackBtnLabelRaw)},
+  ackText:${jsLit(ackTextRaw)},
+  ackBtnLabel:${jsLit(ackBtnLabelRaw)},
   ccDefaultOn:${ccDefaultOn?'true':'false'},
-  theme:${JSON.stringify(theme)},
-  links:${JSON.stringify(links)}
+  theme:${jsLit(theme)},
+  links:${jsLit(links)}
 };
 function _esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function applyConfigToUI(){
@@ -1785,7 +1807,7 @@ function applyConfigToUI(){
   if(CFG.title){document.title=CFG.title;const h=document.querySelector('.hdr h1');if(h)h.textContent=CFG.title;}
   // Description
   const descEl=document.getElementById('coursedesc');
-  if(descEl&&CFG.description){descEl.textContent=CFG.description;descEl.style.display='';}
+  if(descEl&&typeof CFG.description==='string'){descEl.textContent=CFG.description;descEl.style.display=CFG.description?'':'none';}
   // External links
   const er=document.getElementById('extResources');
   const ll=document.getElementById('extLinkList');
@@ -1820,9 +1842,9 @@ const configReady=fetch('config.xml')
       }
       const th=g('theme');if(th&&THEMES[th])CFG.theme=th;
       const ttl=g('title');if(ttl)CFG.title=ttl;
-      const dsc=g('description');if(dsc)CFG.description=dsc;
-      const lnkEls=[...xdoc.querySelectorAll('links link')];
-      if(lnkEls.length)CFG.links=lnkEls.map(l=>({title:l.getAttribute('label')||l.textContent.trim(),url:l.getAttribute('url')||''}));
+      const dscEl=xdoc.querySelector('description');if(dscEl)CFG.description=dscEl.textContent.trim();
+      const linksEl=xdoc.querySelector('links');
+      if(linksEl)CFG.links=[...linksEl.querySelectorAll('link')].map(l=>({title:l.getAttribute('label')||l.textContent.trim(),url:l.getAttribute('url')||''})).filter(l=>l.url);
     }catch(e){}
   })
   .catch(()=>{});
@@ -1830,6 +1852,9 @@ const configReady=fetch('config.xml')
 // ── State ──────────────────────────────────────────────────────────────────
 let THRESH=${threshold}, GRAN=0.5;
 let dur=0, buckets=[], done=false, ackConfirmed=false, lmsOk=false, resumeTime=0, probeIntervalId=0;
+let wasPassed=false, lmsFinished=false, sessionStart=Date.now();
+let lmsReadyResolve;
+const lmsReady=new Promise(r=>{lmsReadyResolve=r;});
 
 
 function onLmsDisconnect(){
@@ -1869,7 +1894,7 @@ const confirmExitBtn=document.getElementById('confirmExitBtn');
 const exitModalBody=document.getElementById('exitModalBody');
 
 // ── Bookmark helpers ───────────────────────────────────────────────────────
-// SCORM 1.2 bookmark = cmi.core.lesson_location (string, max 255 chars)
+// SCORM 1.2 bookmark = cmi.suspend_data (string, max 4096 chars)
 // We store JSON: { t: currentTime, b: base64-encoded bit-array of buckets }
 // If no LMS, fall back to sessionStorage so standalone preview still works.
 
@@ -1922,67 +1947,77 @@ function loadBookmark(){
 
 // ── LMS init & bookmark restore ───────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',async ()=>{
-  await configReady;
-  applyConfigToUI();
-  lmsOk=SCORM.start();
-  if(lmsOk){
-    dt.className='dot ok';
-    dl.textContent='Learning Management System connected';
-    dbgLog_('in','LMSInitialize','init=true — connected');
-    // Read previous lesson_status — if already passed, restore that state
-    const prevStatus=SCORM.get('cmi.core.lesson_status');
-    if(prevStatus==='passed'||prevStatus==='completed'){
-      done=true;
+  try{
+    await configReady;
+    applyConfigToUI();
+    lmsOk=SCORM.start();
+    if(lmsOk){
+      sessionStart=Date.now();
+      dt.className='dot ok';
+      dl.textContent='Learning Management System connected';
+      dbgLog_('in','LMSInitialize','init=true — connected');
+      // Read previous lesson_status — if already passed, restore that state
+      const prevStatus=SCORM.get('cmi.core.lesson_status');
+      if(prevStatus==='passed'||prevStatus==='completed'){
+        // Already complete in the LMS: never downgrade, and don't ask for acknowledgement again
+        done=true;wasPassed=true;ackConfirmed=true;
+      } else {
+        SCORM.set('cmi.core.lesson_status','incomplete');
+        SCORM.commit();
+      }
+      // Heartbeat to detect session loss: every 2s while the video plays, every 30s otherwise
+      let lastProbe=0;
+      probeIntervalId=setInterval(()=>{
+        if(!lmsOk)return;
+        const now=Date.now();
+        if(!vid.paused||now-lastProbe>=30000){lastProbe=now;SCORM.probe();}
+      }, 2000);
     } else {
-      SCORM.set('cmi.core.lesson_status','incomplete');
-      SCORM.commit();
+      dt.className='dot err';
+      dl.textContent='No Learning Management System detected (standalone)';
+      dbgLog_('info','LMSInitialize','no API found — standalone mode');
     }
-    // Active heartbeat: probe the LMS every 5 seconds to detect session loss
-    // Poll every 2s — same-origin popup means opener.location is directly readable
-    probeIntervalId=setInterval(()=>{ if(lmsOk)SCORM.probe(); }, 2000);
-  } else {
-    dt.className='dot err';
-    dl.textContent='No Learning Management System detected (standalone)';
-    dbgLog_('info','LMSInitialize','no API found — standalone mode');
+  }finally{
+    lmsReadyResolve();
   }
 });
 
 // Restore bookmark once video metadata is available
-vid.addEventListener('loadedmetadata',()=>{
+vid.addEventListener('loadedmetadata',async ()=>{
   dur=vid.duration;
   buckets=new Array(Math.ceil(dur/GRAN)).fill(false);
   lastMarkTime=0;
   resize();
+  sw.setAttribute('aria-valuemax',Math.round(dur));
   updateThumb();
+  updateTime();
   // Show idle play icon until the user first starts playback
   playFlash.innerHTML='&#9654;';
   playFlash.classList.add('idle');
 
+  // The bookmark must be read from the LMS, so wait until the LMS connection is established
+  await lmsReady;
   const bm=loadBookmark();
-  if(bm&&bm.time>1){
-    let pct=0;
-    if(bm.buckets.length===buckets.length){
-      // Bucket count matches — restore position and watched segments
-      buckets=bm.buckets.slice();
+  // A bookmark from a different-length video can't be mapped onto this one, so it's ignored
+  if(bm&&bm.buckets.length===buckets.length){
+    for(let i=0;i<buckets.length;i++)buckets[i]=buckets[i]||bm.buckets[i];
+    if(bm.time>1){
       resumeTime=bm.time;
-      vid.currentTime=bm.time;
-      pct=Math.round((bm.buckets.filter(Boolean).length/buckets.length)*100);
+      if(vid.paused)vid.currentTime=bm.time;
+      const pct=Math.round(frac()*100);
       rsub.textContent='Position '+ft(bm.time)+' \u2014 '+pct+'% previously watched';
       rb.classList.add('on');
-    } else {
-      // Bucket count mismatch — start from beginning, no resume banner
-      resumeTime=0;
-      vid.currentTime=0;
     }
-    // If they were already complete, restore that display
-    if(done||pct>=Math.round(THRESH*100)){
-      done=true;
-      sv.textContent='Complete';sv.className='sval done';
-      bn.classList.add('on');
-    }
-    updateStats();
-    draw();
   }
+  if(wasPassed){
+    showCompleteUI();
+    const bnTitle=document.getElementById('bnTitle');
+    const bnSub=document.getElementById('bnSub');
+    if(bnTitle)bnTitle.textContent='Completion recorded';
+    if(bnSub)bnSub.textContent='Previously completed — Learning Management System notified';
+  }
+  updateStats(); // also records completion if the restored progress already meets the threshold
+  draw();
 });
 
 resumeBtn.addEventListener('click',()=>{
@@ -1991,22 +2026,70 @@ resumeBtn.addEventListener('click',()=>{
   vid.play();
 });
 
-// Auto-save bookmark every 10 seconds while playing
+// Auto-save bookmark every 5 seconds while playing
 setInterval(()=>{if(!vid.paused&&dur>0)saveBookmark();},5000);
 
+// ── Completion ─────────────────────────────────────────────────────────────
+function showCompleteUI(){
+  sv.textContent='Complete';sv.className='sval done';
+  bn.classList.add('on');
+  document.getElementById('xb').classList.remove('on');
+  const scb=document.getElementById('selfCompleteBtn');
+  if(scb)scb.classList.remove('visible');
+}
+function reportPassed(){
+  if(!lmsOk)return;
+  SCORM.set('cmi.core.lesson_status','passed');
+  SCORM.set('cmi.core.score.raw','100');
+  SCORM.set('cmi.core.score.min','0');
+  SCORM.set('cmi.core.score.max','100');
+  SCORM.commit();
+  dl.textContent='Completion sent to Learning Management System ✓';
+}
+// Single entry point for reaching completion (threshold met or learner self-completes)
+function markComplete(){
+  if(done)return;
+  done=true;
+  showCompleteUI();
+  if(!CFG.enableAck)reportPassed();
+  else if(lmsOk)dl.textContent='Completion pending — acknowledgement required before reporting to Learning Management System';
+}
+
 // ── Exit flow ──────────────────────────────────────────────────────────────
+// SCORM 1.2 CMITimespan: HH:MM:SS.SS
+function scormTime(ms){
+  const cs=Math.max(0,Math.floor(ms/10));
+  const h=Math.min(9999,Math.floor(cs/360000)),m=Math.floor(cs/6000)%60,s=Math.floor(cs/100)%60,c=cs%100;
+  const p=n=>String(n).padStart(2,'0');
+  return p(h)+':'+p(m)+':'+p(s)+'.'+p(c);
+}
+// Report the session's outcome and close it. Returns false if there was no open LMS session.
+function endLmsSession(){
+  if(!lmsOk)return false;
+  const complete=wasPassed||(done&&ackConfirmed);
+  if(!complete){
+    SCORM.set('cmi.core.lesson_status','incomplete');
+    SCORM.set('cmi.core.exit','suspend'); // tells the LMS to resume this attempt next launch
+  }
+  SCORM.set('cmi.core.session_time',scormTime(Date.now()-sessionStart));
+  SCORM.commit();
+  SCORM.finish();
+  // Session is over: stop all further LMS calls (autosave, probe, unload handler)
+  lmsOk=false;lmsFinished=true;
+  clearInterval(probeIntervalId);
+  return true;
+}
 function doExit(){
   vid.pause();
   saveBookmark();
-  if(lmsOk){
-    if(!done||!ackConfirmed)SCORM.set('cmi.core.lesson_status','incomplete');
-    SCORM.commit();
-    SCORM.finish();
+  if(endLmsSession()){
     dl.textContent='Progress saved. Closing…';
     setTimeout(()=>{
       try{window.close();}catch(e){}
       dl.textContent='Progress saved ✓ — you may close this window.';
     },300);
+  } else if(lmsFinished){
+    dl.textContent='Progress saved ✓ — you may close this window.';
   } else {
     dl.textContent='Progress saved ✓';
     setTimeout(()=>{ dl.textContent='No Learning Management System detected (standalone)'; },2500);
@@ -2017,29 +2100,28 @@ const ackOverlay=document.getElementById('ackOverlay');
 const ackConfirmBtn=document.getElementById('ackConfirmBtn');
 const ackDeclineBtn=document.getElementById('ackDeclineBtn');
 
+// Show a dialog and move keyboard focus into it
+function openOverlay(ov,focusEl){
+  ov.classList.add('on');
+  setTimeout(()=>{if(focusEl)focusEl.focus();},0);
+}
+
 exitBtn.addEventListener('click',()=>{
   vid.pause();
-  if(done&&CFG.enableAck&&ackOverlay){
-    ackOverlay.classList.add('on');
+  if(done&&CFG.enableAck&&!ackConfirmed&&ackOverlay){
+    openOverlay(ackOverlay,ackConfirmBtn);
   } else {
     exitModalBody.textContent=done
       ?'Your completion has been recorded. Your position will be saved if you want to rewatch.'
       :'Your progress will be saved and you can resume from where you left off next time.';
-    exitOverlay.classList.add('on');
+    openOverlay(exitOverlay,cancelExitBtn);
   }
 });
 
 if(ackConfirmBtn){
   ackConfirmBtn.addEventListener('click',()=>{
     ackOverlay.classList.remove('on');
-    if(lmsOk&&done){
-      SCORM.set('cmi.core.lesson_status','passed');
-      SCORM.set('cmi.core.score.raw','100');
-      SCORM.set('cmi.core.score.min','0');
-      SCORM.set('cmi.core.score.max','100');
-      SCORM.commit();
-      dl.textContent='Completion sent to Learning Management System \u2713';
-    }
+    if(done)reportPassed();
     ackConfirmed=true;
     // Update banner to reflect that completion is now recorded
     const bnTitle=document.getElementById('bnTitle');
@@ -2069,7 +2151,15 @@ confirmExitBtn.addEventListener('click',()=>{
 // Also handle browser/LMS-driven unload (tab close, LMS navigation)
 window.addEventListener('beforeunload',()=>{
   if(dur>0)saveBookmark();
-  if(lmsOk){if(!done||!ackConfirmed)SCORM.set('cmi.core.lesson_status','incomplete');SCORM.commit();SCORM.finish();}
+  endLmsSession();
+});
+
+// Escape closes whichever dialog is open, same as its Cancel button
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  if(exitOverlay.classList.contains('on'))cancelExitBtn.click();
+  else if(scOverlay.classList.contains('on'))scCancelBtn.click();
+  else if(ackOverlay&&ackOverlay.classList.contains('on')&&ackDeclineBtn)ackDeclineBtn.click();
 });
 
 // ── Canvas seekbar ─────────────────────────────────────────────────────────
@@ -2106,36 +2196,27 @@ function rr(c,x,y,w,h,r){
 
 // ── Video events ───────────────────────────────────────────────────────────
 vid.addEventListener('timeupdate',()=>{mark();updateThumb();draw();updateStats();updateTime();});
-vid.addEventListener('play',()=>{pb.innerHTML='';pb.classList.add('playing');document.getElementById('xb').classList.remove('on');rb.classList.remove('on');playFlash.classList.remove('idle');});
-vid.addEventListener('pause',()=>{pb.classList.remove('playing');pb.innerHTML='&#9654;';});
+vid.addEventListener('play',()=>{pb.innerHTML='';pb.classList.add('playing');pb.setAttribute('aria-label','Pause');document.getElementById('xb').classList.remove('on');rb.classList.remove('on');playFlash.classList.remove('idle');});
+vid.addEventListener('pause',()=>{pb.classList.remove('playing');pb.innerHTML='&#9654;';pb.setAttribute('aria-label','Play');});
 // ── Self-complete button ──────────────────────────────────────────────────
 const selfCompleteBtn=document.getElementById('selfCompleteBtn');
-if(selfCompleteBtn){
-  // Show the button once playback has started (not immediately on load), but only if enabled
-  vid.addEventListener('play',()=>{
-    if(!done&&CFG.allowSelfComplete)selfCompleteBtn.classList.add('visible');
-  },{once:true});
-  selfCompleteBtn.addEventListener('click',()=>{
-    if(done)return;
-    if(!confirm('Mark this module as complete? Your current progress will be saved.'))return;
-    done=true;
-    selfCompleteBtn.classList.remove('visible');
-    sv.textContent='Complete';sv.className='sval done';
-    bn.classList.add('on');
-    if(!CFG.enableAck){const s=document.getElementById('bnSub');if(s)s.textContent='Marked complete manually';}
-    document.getElementById('xb').classList.remove('on');
-    if(lmsOk&&!CFG.enableAck){
-      SCORM.set('cmi.core.lesson_status','passed');
-      SCORM.set('cmi.core.score.raw','100');
-      SCORM.set('cmi.core.score.min','0');
-      SCORM.set('cmi.core.score.max','100');
-      SCORM.commit();
-      dl.textContent='Completion sent to Learning Management System \u2713';
-    } else if(lmsOk&&CFG.enableAck){
-      dl.textContent='Completion pending \u2014 acknowledgement required before reporting to Learning Management System';
-    }
-  });
-}
+const scOverlay=document.getElementById('scOverlay');
+const scCancelBtn=document.getElementById('scCancelBtn');
+const scConfirmBtn=document.getElementById('scConfirmBtn');
+// Show the button once config.xml and the learner's LMS status are known (not if already complete)
+lmsReady.then(()=>{
+  if(!done&&CFG.allowSelfComplete)selfCompleteBtn.classList.add('visible');
+});
+selfCompleteBtn.addEventListener('click',()=>{
+  if(done)return;
+  openOverlay(scOverlay,scCancelBtn);
+});
+scCancelBtn.addEventListener('click',()=>{scOverlay.classList.remove('on');});
+scConfirmBtn.addEventListener('click',()=>{
+  scOverlay.classList.remove('on');
+  markComplete();
+  if(!CFG.enableAck){const s=document.getElementById('bnSub');if(s)s.textContent='Marked complete manually';}
+});
 
 function firstGapTime(){
   // Find the first unwatched bucket and return its start time in seconds
@@ -2188,20 +2269,7 @@ function updateStats(){
   const f=frac(),p=Math.round(f*100);
   pw.textContent=p+'%';
   pw.className='sval'+(f>=THRESH?' done':'');
-  if(f>=THRESH&&!done){
-    done=true;sv.textContent='Complete';sv.className='sval done';
-    bn.classList.add('on');
-    if(lmsOk&&!CFG.enableAck){
-      SCORM.set('cmi.core.lesson_status','passed');
-      SCORM.set('cmi.core.score.raw','100');
-      SCORM.set('cmi.core.score.min','0');
-      SCORM.set('cmi.core.score.max','100');
-      SCORM.commit();
-      dl.textContent='Completion sent to Learning Management System \u2713';
-    } else if(lmsOk&&CFG.enableAck){
-      dl.textContent='Completion pending \u2014 acknowledgement required before reporting to Learning Management System';
-    }
-  }
+  if(f>=THRESH&&!done)markComplete();
 }
 
 function updateTime(){td.textContent=ft(vid.currentTime)+' / '+ft(dur);}
@@ -2216,21 +2284,33 @@ function updateThumb(){
   // Clamp to [0,100] so thumb stays fully inside seekwrap at start and end
   const pct=Math.max(0,Math.min(100,vid.currentTime/dur*100));
   th.style.left=pct+'%';
+  sw.setAttribute('aria-valuenow',Math.round(vid.currentTime));
+  sw.setAttribute('aria-valuetext',ft(vid.currentTime)+' of '+ft(dur));
 }
 
-// ── Seekbar drag ───────────────────────────────────────────────────────────
+// ── Seekbar drag + hover preview ───────────────────────────────────────────
 let drag=false, isSeeking=false;
 const scrubPrev=document.getElementById('scrubPrev');
+const prevVid=document.getElementById('prevVid');
+function positionScrubPrev(frac,r){
+  if(!scrubPrev)return;
+  const pw=192;
+  const px=frac*r.width;
+  scrubPrev.style.left=Math.max(pw/2,Math.min(r.width-pw/2,px))+'px';
+}
+function drawScrubFrame(source){
+  if(!scrubPrev)return;
+  const vw=source.videoWidth||192,vh=source.videoHeight||108;
+  const scale=Math.min(192/vw,108/vh);
+  const dw=vw*scale,dh=vh*scale;
+  scrubPrev.getContext('2d').drawImage(source,(192-dw)/2,(108-dh)/2,dw,dh);
+}
 function seekTo(e){
   const r=sw.getBoundingClientRect();
   const frac=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
   if(dur)vid.currentTime=frac*dur;
   th.style.left=(frac*100)+'%';
-  if(drag&&scrubPrev){
-    const pw=192;
-    const px=frac*r.width;
-    scrubPrev.style.left=Math.max(pw/2,Math.min(r.width-pw/2,px))+'px';
-  }
+  if(drag)positionScrubPrev(frac,r);
 }
 sw.addEventListener('mousedown',e=>{
   drag=true;
@@ -2242,6 +2322,23 @@ document.addEventListener('mouseup',()=>{
   drag=false;
   if(scrubPrev)scrubPrev.classList.remove('on');
 });
+// Hover preview (no drag)
+sw.addEventListener('mousemove',e=>{
+  if(drag||!dur||!scrubPrev||!prevVid)return;
+  const r=sw.getBoundingClientRect();
+  const frac=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+  positionScrubPrev(frac,r);
+  scrubPrev.classList.add('on');
+  prevVid.currentTime=frac*dur;
+});
+sw.addEventListener('mouseleave',()=>{
+  if(!drag&&scrubPrev)scrubPrev.classList.remove('on');
+});
+if(prevVid){
+  prevVid.addEventListener('seeked',()=>{
+    if(!drag)drawScrubFrame(prevVid);
+  });
+}
 
 // ── Seekbar tooltip ───────────────────────────────────────────────────────
 const seekTip=document.getElementById('seekTip');
@@ -2265,12 +2362,7 @@ document.getElementById('rwb').addEventListener('click',()=>{
 vid.addEventListener('seeking',()=>{isSeeking=true;});
 vid.addEventListener('seeked',()=>{
   isSeeking=false;lastMarkTime=vid.currentTime;
-  if(drag&&scrubPrev){
-    const vw=vid.videoWidth||192,vh=vid.videoHeight||108;
-    const scale=Math.min(192/vw,108/vh);
-    const dw=vw*scale,dh=vh*scale;
-    scrubPrev.getContext('2d').drawImage(vid,(192-dw)/2,(108-dh)/2,dw,dh);
-  }
+  if(drag)drawScrubFrame(vid);
 });
 sw.addEventListener('touchstart',e=>seekTo(e.touches[0]),{passive:true});
 sw.addEventListener('touchmove',e=>seekTo(e.touches[0]),{passive:true});
@@ -2314,19 +2406,12 @@ document.getElementById('dbgClear').addEventListener('click',()=>{
 document.getElementById('dbgComplete').addEventListener('click',()=>{
   if(!confirm('Force send completion to the LMS? This will mark the module as passed with a score of 100 regardless of watch progress.'))return;
   dbgLog_('out','FORCE COMPLETE','Sending passed status to LMS...');
-  SCORM.set('cmi.core.lesson_status','passed');
-  SCORM.set('cmi.core.score.raw','100');
-  SCORM.set('cmi.core.score.min','0');
-  SCORM.set('cmi.core.score.max','100');
-  SCORM.commit();
-  // Also update UI to reflect completion
-  done=true;
-  sv.textContent='Complete';
-  sv.className='sval done';
-  bn.classList.add('on');
+  // Bypasses the watch threshold and the acknowledgement step
+  done=true;ackConfirmed=true;
+  reportPassed();
+  showCompleteUI();
   pw.textContent='100%';
   pw.className='sval done';
-  dl.textContent='Completion sent to Learning Management System \u2713';
   dbgLog_('in','FORCE COMPLETE','Done — LMS updated');
 });
 
@@ -2354,15 +2439,44 @@ SCORM.finish=function(){
   _origFinish();
 };
 
+// ── Keyboard: Space = play/pause, Left/Right = back/forward 5s ──────────────
+function seekBy(sec){
+  if(!dur)return;
+  vid.currentTime=Math.max(0,Math.min(dur,vid.currentTime+sec));
+  updateThumb();
+}
 document.addEventListener('keydown',e=>{
-  if(e.code==='Space'&&e.target.tagName!=='INPUT'&&e.target.tagName!=='TEXTAREA'&&e.target.tagName!=='SELECT'&&e.target.tagName!=='BUTTON'){
+  const tag=e.target.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')return;
+  if(document.querySelector('.overlay.on'))return;
+  if(e.code==='Space'&&tag!=='BUTTON'){
     e.preventDefault();
     vid.paused?vid.play():vid.pause();
+  } else if(e.key==='ArrowLeft'){
+    e.preventDefault();seekBy(-5);
+  } else if(e.key==='ArrowRight'){
+    e.preventDefault();seekBy(5);
   }
+});
+// Seek bar as a keyboard slider (focused via Tab)
+sw.addEventListener('keydown',e=>{
+  if(!dur)return;
+  let handled=true;
+  if(e.key==='ArrowLeft'||e.key==='ArrowDown')seekBy(-5);
+  else if(e.key==='ArrowRight'||e.key==='ArrowUp')seekBy(5);
+  else if(e.key==='PageDown')seekBy(-30);
+  else if(e.key==='PageUp')seekBy(30);
+  else if(e.key==='Home'){vid.currentTime=0;updateThumb();}
+  else if(e.key==='End'){vid.currentTime=dur;updateThumb();}
+  else handled=false;
+  if(handled){e.preventDefault();e.stopPropagation();}
 });
 vs.addEventListener('input',()=>{vid.volume=vs.value;vid.muted=vid.volume===0;updateVol();});
 mb.addEventListener('click',()=>{vid.muted=!vid.muted;updateVol();});
-function updateVol(){mb.innerHTML=vid.muted||vid.volume===0?'&#128263;':vid.volume<0.5?'&#128265;':'&#128266;';}
+function updateVol(){
+  mb.innerHTML=vid.muted||vid.volume===0?'&#128263;':vid.volume<0.5?'&#128265;':'&#128266;';
+  mb.setAttribute('aria-label',vid.muted||vid.volume===0?'Unmute':'Mute');
+}
 document.getElementById('fsb').addEventListener('click',()=>{
   const shell=document.querySelector('.shell');
   if(!document.fullscreenElement){
@@ -2388,7 +2502,11 @@ document.getElementById('fsb').addEventListener('click',()=>{
     vid.style.height=isFS?'100%':'';
     vid.style.width=isFS?'100%':'';
     const er=document.getElementById('extResources');
-    if(er)er.style.display=isFS?'none':'';
+    if(er)er.style.display=isFS?'none':(CFG.links&&CFG.links.length?'':'none');
+    const bn=document.getElementById('bn');
+    if(bn)bn.style.display=isFS?'none':'';
+    const lmsrow=document.querySelector('.lmsrow');
+    if(lmsrow)lmsrow.style.display=isFS?'none':'';
   }
   document.addEventListener('fullscreenchange',onFSChange);
   document.addEventListener('webkitfullscreenchange',onFSChange);
@@ -2523,11 +2641,11 @@ const cctrack=document.getElementById('cctrack');
 const CC_DEFAULT_ON=CFG.ccDefaultOn;
 function enableCaptions(){
   for(let i=0;i<vid.textTracks.length;i++)vid.textTracks[i].mode='showing';
-  if(ccbtn)ccbtn.classList.add('active');
+  if(ccbtn){ccbtn.classList.add('active');ccbtn.setAttribute('aria-pressed','true');}
 }
 function disableCaptions(){
   for(let i=0;i<vid.textTracks.length;i++)vid.textTracks[i].mode='disabled';
-  if(ccbtn)ccbtn.classList.remove('active');
+  if(ccbtn){ccbtn.classList.remove('active');ccbtn.setAttribute('aria-pressed','false');}
 }
 fetch('captions.vtt')
   .then(r=>{if(!r.ok)throw new Error();return r.text();})
@@ -2583,6 +2701,15 @@ function secsToISO(s){
   return 'PT' + (h ? h + 'H' : '') + (m ? m + 'M' : '') + (sec || (!h && !m) ? sec + 'S' : '');
 }
 
+// Stable per-title ID: different courses get different IDs, rebuilding the same course keeps its ID
+function manifestId(title) {
+  const t = String(title);
+  const slug = t.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+  let h = 5381;
+  for (const ch of t) h = ((h * 33) ^ ch.codePointAt(0)) >>> 0;
+  return 'scorm_' + (slug ? slug + '_' : '') + h.toString(36);
+}
+
 function buildManifest(title, hasCaptions, durationSecs, desc) {
   const x = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const xTitle = x(title);
@@ -2613,7 +2740,7 @@ function buildManifest(title, hasCaptions, durationSecs, desc) {
     <schemaversion>1.2</schemaversion>
   </metadata>`;
   return `<?xml version="1.0" encoding="UTF-8"?>
-<manifest identifier="video_scorm_pkg" version="1.2"
+<manifest identifier="${manifestId(title)}" version="1.2"
   xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
   xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2"
   xmlns:imsmd="http://www.imsglobal.org/xsd/imsmd_rootv1p2p1"
@@ -2631,6 +2758,7 @@ function buildManifest(title, hasCaptions, durationSecs, desc) {
   <resources>
     <resource identifier="resource_1" type="webcontent" adlcp:scormtype="sco" href="index.html">
       <file href="index.html"/>
+      <file href="config.xml"/>
       <file href="video.mp4"/>
       ${hasCaptions ? '<file href="captions.vtt"/>' : ''}
     </resource>
@@ -2653,7 +2781,6 @@ function buildConfigXml(title, videoFilename, desc, threshold, allowSelfComplete
   Settings:
     title               - Course title shown in the player header
     description         - Short description shown below the title (leave blank to hide)
-    video               - Video filename inside the package (default: video.mp4)
     theme               - Player theme: bmcd | clean | a11y | techie
     threshold           - Completion percentage required (1-100)
     allow-self-complete - true | false  (show "Mark as complete" button)
@@ -2664,7 +2791,6 @@ function buildConfigXml(title, videoFilename, desc, threshold, allowSelfComplete
 <player-config>
   <title>${x(title)}</title>
   <description>${x(desc||'')}</description>
-  <video>${x(videoFilename)}</video>
   <theme>${x(theme)}</theme>
   <threshold>${Math.round(threshold * 100)}</threshold>
   <allow-self-complete>${allowSelfComplete ? 'true' : 'false'}</allow-self-complete>
@@ -2677,6 +2803,94 @@ function buildConfigXml(title, videoFilename, desc, threshold, allowSelfComplete
 ${linksXml}
   </links>
 </player-config>`;
+}
+
+// ─── ZIP writer (stored, uncompressed) ────────────────────────────────────
+// The zip Blob is assembled from references to the source files, so the video is never
+// loaded into memory as a whole; it is only read in 8 MB chunks to compute its CRC-32.
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+async function crc32OfBlob(blob, onProgress) {
+  const CHUNK = 8 * 1024 * 1024;
+  let crc = 0xFFFFFFFF;
+  for (let off = 0; off < blob.size; off += CHUNK) {
+    const bytes = new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer());
+    for (let i = 0; i < bytes.length; i++) crc = CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    if (onProgress) onProgress(Math.min(1, (off + bytes.length) / blob.size));
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// entries: [{ name, data: string | Blob }]; onProgress(fraction 0..1)
+async function buildZip(entries, onProgress) {
+  const ZIP_LIMIT = 0xFFFFFFFF; // classic ZIP offsets/sizes are 32-bit
+  const enc = new TextEncoder();
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const blobs = entries.map(e => typeof e.data === 'string' ? new Blob([enc.encode(e.data)]) : e.data);
+  const totalBytes = blobs.reduce((n, b) => n + b.size, 0) || 1;
+  const tooBig = () => new Error('The package would be larger than 4 GB, which is more than a SCORM ZIP can hold. Please use a smaller video.');
+  if (totalBytes > ZIP_LIMIT) throw tooBig();
+
+  const parts = [], central = [];
+  let offset = 0, bytesDone = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const name = enc.encode(entries[i].name);
+    const data = blobs[i];
+    const size = data.size;
+    const crc = await crc32OfBlob(data, f => onProgress && onProgress((bytesDone + f * size) / totalBytes));
+    bytesDone += size;
+
+    const local = new DataView(new ArrayBuffer(30));
+    local.setUint32(0, 0x04034b50, true);  // local file header signature
+    local.setUint16(4, 20, true);          // version needed (2.0)
+    local.setUint16(6, 0x0800, true);      // flags: UTF-8 file names
+    local.setUint16(8, 0, true);           // method: stored
+    local.setUint16(10, dosTime, true);
+    local.setUint16(12, dosDate, true);
+    local.setUint32(14, crc, true);
+    local.setUint32(18, size, true);       // compressed size
+    local.setUint32(22, size, true);       // uncompressed size
+    local.setUint16(26, name.length, true);
+    local.setUint16(28, 0, true);          // extra field length
+
+    const cd = new DataView(new ArrayBuffer(46));
+    cd.setUint32(0, 0x02014b50, true);     // central directory header signature
+    cd.setUint16(4, 20, true);             // version made by
+    cd.setUint16(6, 20, true);             // version needed
+    cd.setUint16(8, 0x0800, true);
+    cd.setUint16(10, 0, true);
+    cd.setUint16(12, dosTime, true);
+    cd.setUint16(14, dosDate, true);
+    cd.setUint32(16, crc, true);
+    cd.setUint32(20, size, true);
+    cd.setUint32(24, size, true);
+    cd.setUint16(28, name.length, true);
+    cd.setUint32(42, offset, true);        // offset of local header
+
+    parts.push(local.buffer, name, data);
+    central.push(cd.buffer, name);
+    offset += 30 + name.length + size;
+  }
+  const cdSize = central.reduce((n, p) => n + p.byteLength, 0);
+  if (offset + cdSize + 22 > ZIP_LIMIT) throw tooBig();
+
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true);      // end of central directory signature
+  end.setUint16(8, entries.length, true);
+  end.setUint16(10, entries.length, true);
+  end.setUint32(12, cdSize, true);
+  end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
 }
 
 // ─── Generate package ─────────────────────────────────────────────────────
@@ -2698,12 +2912,9 @@ generateBtn.addEventListener('click', async () => {
   btnText.textContent = 'Building…';
   successBanner.classList.remove('visible');
 
-  setProgress(5, 'Reading video file…');
+  setProgress(5, 'Reading video metadata…');
 
   try {
-    const videoBytes = await selectedFile.arrayBuffer();
-    setProgress(20, 'Reading video metadata…');
-
     // Read duration from the preview player if metadata is already loaded, else detect via temp element
     const previewVidEl = document.getElementById('previewVid');
     const durationSecs = (previewVidEl && isFinite(previewVidEl.duration) && previewVidEl.duration > 0)
@@ -2711,13 +2922,13 @@ generateBtn.addEventListener('click', async () => {
       : await new Promise(resolve => {
           const tmp = document.createElement('video');
           tmp.preload = 'metadata';
-          const url = URL.createObjectURL(new Blob([videoBytes], { type: 'video/mp4' }));
+          const url = URL.createObjectURL(selectedFile);
           tmp.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(tmp.duration || 0); };
           tmp.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
           tmp.src = url;
         });
 
-    setProgress(40, 'Generating player and manifest…');
+    setProgress(10, 'Generating player and manifest…');
 
     // Handle captions: convert SRT→VTT if needed, or read VTT directly
     let vttText = null;
@@ -2734,21 +2945,18 @@ generateBtn.addEventListener('click', async () => {
     const manifest = buildManifest(title, hasCaptions, durationSecs, desc);
     const configXml = buildConfigXml(title, 'video.mp4', desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, externalLinks, playerTheme);
 
-    setProgress(60, 'Compressing package…');
+    const entries = [
+      { name: 'imsmanifest.xml', data: manifest },
+      { name: 'config.xml', data: configXml },
+      { name: 'index.html', data: playerHTML },
+      { name: 'video.mp4', data: selectedFile }
+    ];
+    if (vttText) entries.push({ name: 'captions.vtt', data: vttText });
 
-    const zip = new JSZip();
-    zip.file('imsmanifest.xml', manifest);
-    zip.file('config.xml', configXml);
-    zip.file('index.html', playerHTML);
-    zip.file('video.mp4', videoBytes, { binary: true });
-    if (vttText) zip.file('captions.vtt', vttText);
-
-    setProgress(80, 'Finalizing ZIP…');
-
-    const blob = await zip.generateAsync(
-      { type: 'blob', compression: 'STORE' },
-      meta => { setProgress(80 + Math.round(meta.percent * 0.18), 'Compressing… ' + Math.round(meta.percent) + '%'); }
-    );
+    const blob = await buildZip(entries, f => {
+      const pct = Math.min(100, Math.round(f * 100));
+      setProgress(15 + Math.round(pct * 0.83), 'Packaging… ' + pct + '%');
+    });
 
     setProgress(100, 'Done!');
 
@@ -2818,8 +3026,7 @@ generateBtn.addEventListener('click', async () => {
 // ── Self-download link ────────────────────────────────────────────────────
 document.getElementById('selfDownload').addEventListener('click', e => {
   e.preventDefault();
-  const html = document.documentElement.outerHTML;
-  const blob = new Blob([html], { type: 'text/html' });
+  const blob = new Blob([PRISTINE_HTML], { type: 'text/html' });
   try {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
