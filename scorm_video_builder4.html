@@ -852,9 +852,19 @@ const courseTitle = document.getElementById('courseTitle');
 const thresholdSlider = document.getElementById('thresholdSlider');
 const thresholdDisplay = document.getElementById('thresholdDisplay');
 const courseDesc = document.getElementById('courseDesc');
-thresholdSlider.addEventListener('input', () => {
+// The last threshold used is remembered in this browser
+const THRESHOLD_KEY = 'scormVideoBuilder.threshold';
+function showThreshold() {
   thresholdDisplay.textContent = thresholdSlider.value + '%';
   document.getElementById('subtitleThreshold').textContent = thresholdSlider.value + '%';
+}
+try {
+  const saved = parseInt(localStorage.getItem(THRESHOLD_KEY), 10);
+  if (saved >= 1 && saved <= 100) { thresholdSlider.value = saved; showThreshold(); }
+} catch (e) {}
+thresholdSlider.addEventListener('input', () => {
+  showThreshold();
+  try { localStorage.setItem(THRESHOLD_KEY, thresholdSlider.value); } catch (e) {}
 });
 
 // Show/hide ack options when checkbox toggled
@@ -2740,7 +2750,7 @@ function buildManifest(title, hasCaptions, durationSecs, desc) {
     <schemaversion>1.2</schemaversion>
   </metadata>`;
   return `<?xml version="1.0" encoding="UTF-8"?>
-<manifest identifier="${manifestId(title)}" version="1.2"
+<manifest identifier="${manifestId(title)}"
   xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
   xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2"
   xmlns:imsmd="http://www.imsglobal.org/xsd/imsmd_rootv1p2p1"
