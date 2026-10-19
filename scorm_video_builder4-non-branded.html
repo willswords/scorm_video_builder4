@@ -408,6 +408,24 @@
     letter-spacing: 0.08em;
   }
 
+  /* ─── Import card ─── */
+  .import-status {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.8rem;
+    background: var(--green-bg);
+    border: 1px solid var(--green-border);
+  }
+  .import-status.visible { display: flex; }
+  .import-status.busy { background: var(--surface2); border-color: var(--border); }
+  .import-status.error { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+  .import-status-text { font-weight: 500; }
+  .import-notes { padding-left: 18px; color: var(--text-mid); font-family: var(--mono); font-size: 0.7rem; display: flex; flex-direction: column; gap: 3px; }
+  .import-notes:empty { display: none; }
+
   .field textarea {
     border: 1px solid var(--border);
     border-radius: 7px;
@@ -824,6 +842,30 @@
       </div>
     </div>
   </div>
+
+  <!-- Import card -->
+  <div class="card">
+    <span class="card-label">Start from an existing package <span class="caps-optional">optional</span></span>
+    <div class="caps-drop" id="importDropZone">
+      <input type="file" id="importInput" accept=".zip,application/zip"/>
+      <div class="caps-drop-icon">&#8634;</div>
+      <div class="caps-drop-text">
+        <div class="caps-drop-title">Drop a package made with this tool, or click to browse</div>
+        <div class="caps-drop-sub">Loads its video, captions and settings so you can change them and build it again</div>
+      </div>
+    </div>
+    <div class="import-status" id="importStatus" role="status">
+      <div class="import-status-text" id="importStatusText"></div>
+      <ul class="import-notes" id="importNotes"></ul>
+    </div>
+    <label class="field-check" id="keepIdWrap" style="display:none;">
+      <input type="checkbox" id="keepId" checked/>
+      <div class="field-check-label">
+        <span class="field-check-title">Keep the original course ID</span>
+        <span class="field-check-sub" id="keepIdSub"></span>
+      </div>
+    </label>
+  </div>
 </div>
 
 <script>
@@ -882,6 +924,8 @@ const capsSize = document.getElementById('capsSize');
 const capsClear = document.getElementById('capsClear');
 
 let selectedCapsFile = null;
+let pendingImportCaps = null;   // captions from an imported package that had no video, applied once a video is chosen
+let importedManifestId = null;  // course ID of the imported package, reused on export if "Keep the original course ID" is ticked
 
 // ── External links ─────────────────────────────────────────────────────────
 let externalLinks = []; // [{title, url}, ...]
@@ -996,8 +1040,9 @@ function parseCuesFromVtt(vtt) {
   return cues;
 }
 
-async function setCaps(file) {
+async function setCaps(file, fromImport) {
   if (!file) return;
+  if (!fromImport) pendingImportCaps = null;
   const ext = file.name.split('.').pop().toLowerCase();
   if (ext !== 'srt' && ext !== 'vtt') {
     alert('Please select a .srt or .vtt captions file.');
@@ -1109,6 +1154,7 @@ function setFile(file) {
     return;
   }
   clearCaps();
+  if (pendingImportCaps) { const caps = pendingImportCaps; pendingImportCaps = null; setCaps(caps, true); }
   selectedFile = file;
   fileName.textContent = file.name;
   fileSize.textContent = fmtBytes(file.size);
@@ -1162,6 +1208,153 @@ fileClear.addEventListener('click', () => {
   document.getElementById('previewToggle').classList.remove('open');
 });
 
+
+// ── Import an existing package ────────────────────────────────────────────
+// Reads the ZIP's central directory and returns entries as Blob slices of the original file,
+// so a large video is never loaded into memory (compressed entries are inflated as a stream).
+async function readZip(file) {
+  const size = file.size;
+  const tailLen = Math.min(size, 65557);
+  const tail = new DataView(await file.slice(size - tailLen).arrayBuffer());
+  let eocd = -1;
+  for (let i = tailLen - 22; i >= 0; i--) if (tail.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error('This file is not a ZIP archive.');
+  const count = tail.getUint16(eocd + 10, true);
+  const cdSize = tail.getUint32(eocd + 12, true);
+  const cdOffset = tail.getUint32(eocd + 16, true);
+  if (count === 0xFFFF || cdOffset === 0xFFFFFFFF) throw new Error('This ZIP is in the ZIP64 format (over 4 GB), which the builder can’t read.');
+  const cd = new DataView(await file.slice(cdOffset, cdOffset + cdSize).arrayBuffer());
+  const dec = new TextDecoder();
+  const entries = new Map();
+  let p = 0;
+  for (let i = 0; i < count; i++) {
+    if (cd.getUint32(p, true) !== 0x02014b50) throw new Error('The ZIP file is damaged.');
+    const nlen = cd.getUint16(p + 28, true), elen = cd.getUint16(p + 30, true), clen = cd.getUint16(p + 32, true);
+    const name = dec.decode(new Uint8Array(cd.buffer, p + 46, nlen)).replace(/\\/g, '/');
+    entries.set(name, { flags: cd.getUint16(p + 8, true), method: cd.getUint16(p + 10, true), csize: cd.getUint32(p + 20, true), lho: cd.getUint32(p + 42, true) });
+    p += 46 + nlen + elen + clen;
+  }
+  async function getBlob(name, type) {
+    const e = entries.get(name);
+    if (!e) return null;
+    if (e.flags & 1) throw new Error(name + ' is encrypted.');
+    const lh = new DataView(await file.slice(e.lho, e.lho + 30).arrayBuffer());
+    if (lh.getUint32(0, true) !== 0x04034b50) throw new Error('The ZIP file is damaged.');
+    const start = e.lho + 30 + lh.getUint16(26, true) + lh.getUint16(28, true);
+    const raw = file.slice(start, start + e.csize, type || '');
+    if (e.method === 0) return raw;
+    if (e.method === 8) {
+      if (typeof DecompressionStream === 'undefined') throw new Error('This browser can’t unzip compressed files. Please use a current version of Edge or Chrome.');
+      const inflated = await new Response(raw.stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob();
+      return type ? new Blob([inflated], { type }) : inflated;
+    }
+    throw new Error('Unsupported compression method in ' + name + '.');
+  }
+  return { names: [...entries.keys()], getBlob };
+}
+
+const importInput = document.getElementById('importInput');
+const importDropZone = document.getElementById('importDropZone');
+const importStatus = document.getElementById('importStatus');
+
+function showImportStatus(kind, text, notes) {
+  importStatus.className = 'import-status visible' + (kind === 'ok' ? '' : ' ' + kind);
+  document.getElementById('importStatusText').textContent = text;
+  const ul = document.getElementById('importNotes');
+  ul.innerHTML = '';
+  (notes || []).forEach(n => { const li = document.createElement('li'); li.textContent = n; ul.appendChild(li); });
+}
+
+async function importPackage(zipFile) {
+  if (!/\.zip$/i.test(zipFile.name)) { showImportStatus('error', 'Please choose a .zip SCORM package.'); return; }
+  showImportStatus('busy', 'Reading ' + zipFile.name + '…');
+  try {
+    const zip = await readZip(zipFile);
+    // The manifest is normally at the root; tolerate everything being inside one folder
+    const manifestPath = zip.names.find(n => n === 'imsmanifest.xml') || zip.names.find(n => /^[^/]+\/imsmanifest\.xml$/.test(n));
+    if (!manifestPath) throw new Error('No imsmanifest.xml found, so this isn’t a SCORM package.');
+    const prefix = manifestPath.slice(0, -'imsmanifest.xml'.length);
+    const has = n => zip.names.includes(prefix + n);
+    if (!has('config.xml') || !has('index.html')) throw new Error('This SCORM package wasn’t made with the SCORM Video Packager, so it can’t be imported.');
+
+    const readText = async n => (await zip.getBlob(prefix + n)).text();
+    const cfg = new DOMParser().parseFromString(await readText('config.xml'), 'application/xml');
+    if (cfg.querySelector('parsererror') || !cfg.querySelector('player-config')) throw new Error('The package’s config.xml is damaged.');
+    const g = sel => { const el = cfg.querySelector(sel); return el ? el.textContent.trim() : null; };
+    const man = new DOMParser().parseFromString(await readText('imsmanifest.xml'), 'application/xml');
+    const manifestIdAttr = man.documentElement ? (man.documentElement.getAttribute('identifier') || '') : '';
+    const notes = [];
+
+    // Video: prefer the file config.xml names, else video.mp4, else any MP4 next to the manifest
+    const level = zip.names.filter(n => n.startsWith(prefix) && !n.slice(prefix.length).includes('/'));
+    const videoName = [g('video'), 'video.mp4'].find(n => n && has(n)) || (level.find(n => /\.mp4$/i.test(n)) || '').slice(prefix.length);
+    const capsBlob = has('captions.vtt') ? await zip.getBlob(prefix + 'captions.vtt', 'text/vtt') : null;
+    const capsFile = capsBlob ? new File([capsBlob], 'captions.vtt', { type: 'text/vtt' }) : null;
+    pendingImportCaps = null;
+    if (videoName) {
+      const videoBlob = await zip.getBlob(prefix + videoName, 'video/mp4');
+      setFile(new File([videoBlob], 'video.mp4', { type: 'video/mp4' }));
+      fileName.textContent = 'video.mp4 (from ' + zipFile.name + ')';
+      if (capsFile) await setCaps(capsFile, true);
+    } else {
+      if (selectedFile) fileClear.click();
+      clearCaps();
+      if (capsFile) pendingImportCaps = capsFile;
+      notes.push('This package has no video in it. Select the video in step 1' + (capsFile ? '; the package’s captions will be added when you do.' : '.'));
+    }
+
+    // Settings
+    courseTitle.value = g('title') || (man.querySelector('organization > title') || {}).textContent || courseTitle.value;
+    courseDesc.value = g('description') || '';
+    const thr = parseInt(g('threshold'), 10);
+    if (thr >= 1 && thr <= 100) { thresholdSlider.value = thr; showThreshold(); }
+    document.getElementById('allowSelfComplete').checked = g('allow-self-complete') === 'true';
+    document.getElementById('ccDefaultOn').checked = g('cc-default-on') !== 'false';
+    const ackEl = cfg.querySelector('acknowledgment');
+    const ackOn = !!ackEl && ackEl.getAttribute('enabled') === 'true';
+    document.getElementById('enableAck').checked = ackOn;
+    document.getElementById('ackOptions').style.display = ackOn ? 'flex' : 'none';
+    const ackTextVal = g('acknowledgment text');
+    document.getElementById('ackText').value = ackTextVal && ackTextVal !== 'I confirm that I have watched this video and understand its content.' ? ackTextVal : '';
+    const btnLabel = g('acknowledgment button-label') || 'Acknowledge';
+    const radio = document.querySelector('input[name=ackBtn][value="' + (btnLabel === 'Yes' ? 'Yes' : 'Acknowledge') + '"]');
+    if (radio) radio.checked = true;
+    if (btnLabel !== 'Yes' && btnLabel !== 'Acknowledge') notes.push('The acknowledgement button said “' + btnLabel + '”, which isn’t one of the options here, so it’s set to “Acknowledge”.');
+    const theme = g('theme');
+    const themeSel = document.getElementById('playerTheme');
+    if (theme && [...themeSel.options].some(o => o.value === theme)) themeSel.value = theme;
+    else if (theme) notes.push('The package used the “' + theme + '” theme, which this builder doesn’t have, so it’s set to “' + themeSel.options[themeSel.selectedIndex].text + '”.');
+    externalLinks = [...cfg.querySelectorAll('links link')]
+      .map(l => ({ title: l.getAttribute('label') || l.textContent.trim(), url: l.getAttribute('url') || '' }))
+      .filter(l => l.url);
+    renderLinks();
+
+    // Course ID: reuse it on export (if ticked) so the LMS treats the rebuild as the same course
+    importedManifestId = /^[A-Za-z_][\w.-]*$/.test(manifestIdAttr) ? manifestIdAttr : null;
+    const keepWrap = document.getElementById('keepIdWrap');
+    if (importedManifestId) {
+      document.getElementById('keepId').checked = true;
+      document.getElementById('keepIdSub').textContent = importedManifestId === 'video_scorm_pkg'
+        ? 'This package has the old ID “video_scorm_pkg” that every package made before Oct 14 shared. Keep it if your LMS needs a matching ID to replace this course; untick to give the course its own ID.'
+        : 'Recommended when replacing a course that’s already in your LMS, so it’s recognised as the same course. ID: ' + importedManifestId;
+      keepWrap.style.display = '';
+    } else {
+      keepWrap.style.display = 'none';
+    }
+    showImportStatus('ok', 'Imported ' + zipFile.name + '. Change anything you like, then build the package again.', notes);
+  } catch (e) {
+    console.error(e);
+    showImportStatus('error', 'Could not import ' + zipFile.name + ': ' + e.message);
+  }
+}
+
+importInput.addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importPackage(f); });
+importDropZone.addEventListener('dragover', e => { e.preventDefault(); importDropZone.classList.add('drag-over'); });
+importDropZone.addEventListener('dragleave', () => importDropZone.classList.remove('drag-over'));
+importDropZone.addEventListener('drop', e => {
+  e.preventDefault(); importDropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) importPackage(e.dataTransfer.files[0]);
+});
 
 // ── Preview toggle ────────────────────────────────────────────────────────
 document.getElementById('previewToggle').addEventListener('click', () => {
@@ -2686,7 +2879,7 @@ function manifestId(title) {
   return 'scorm_' + (slug ? slug + '_' : '') + h.toString(36);
 }
 
-function buildManifest(title, hasCaptions, durationSecs, desc) {
+function buildManifest(title, hasCaptions, durationSecs, desc, idOverride) {
   const x = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const xTitle = x(title);
   const xDesc  = x(desc || '');
@@ -2716,7 +2909,7 @@ function buildManifest(title, hasCaptions, durationSecs, desc) {
     <schemaversion>1.2</schemaversion>
   </metadata>`;
   return `<?xml version="1.0" encoding="UTF-8"?>
-<manifest identifier="${manifestId(title)}"
+<manifest identifier="${x(idOverride || manifestId(title))}"
   xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
   xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2"
   xmlns:imsmd="http://www.imsglobal.org/xsd/imsmd_rootv1p2p1"
@@ -2918,7 +3111,8 @@ generateBtn.addEventListener('click', async () => {
     const hasCaptions = !!vttText;
 
     const playerHTML = buildPlayerHTML(title, 'video.mp4', vttText, desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, externalLinks, playerTheme);
-    const manifest = buildManifest(title, hasCaptions, durationSecs, desc);
+    const keepImportedId = importedManifestId && document.getElementById('keepId').checked;
+    const manifest = buildManifest(title, hasCaptions, durationSecs, desc, keepImportedId ? importedManifestId : null);
     const configXml = buildConfigXml(title, 'video.mp4', desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, externalLinks, playerTheme);
 
     const entries = [
