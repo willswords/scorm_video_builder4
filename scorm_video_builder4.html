@@ -1496,6 +1496,15 @@ video{display:block;width:100%;max-height:500px;object-fit:contain;background:#0
 .shell:fullscreen .ext-resources,.shell:-webkit-full-screen .ext-resources,.shell:-moz-full-screen .ext-resources{display:none}
 .shell:fullscreen #bn,.shell:-webkit-full-screen #bn,.shell:-moz-full-screen #bn{display:none}
 .shell:fullscreen .lmsrow,.shell:-webkit-full-screen .lmsrow,.shell:-moz-full-screen .lmsrow{display:none}
+.shell.fs-video-only>*:not(.vframe):not(.overlay){display:none !important}
+.shell.fs-video-only .vframe{border:none}
+.shell.fs-video-only:not(.show-float),.shell.fs-video-only:not(.show-float) .vframe{cursor:none}
+.fs-float{display:none;position:absolute;top:16px;right:16px;z-index:7;background:rgba(0,0,0,.6);color:#fff;
+  border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:8px 14px;font:600 .8rem var(--sans);cursor:pointer;
+  opacity:0;pointer-events:none;transition:opacity .2s}
+.fs-float:hover{background:rgba(0,0,0,.8)}
+.shell.fs-video-only .fs-float{display:block}
+.shell.fs-video-only.show-float .fs-float{opacity:1;pointer-events:auto}
 .controls{background:var(--surface);border:1px solid var(--border);
   border-top:none;border-radius:0 0 8px 8px;padding:14px 16px 16px;
   display:flex;flex-direction:column;gap:12px}
@@ -1736,6 +1745,7 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
   <p class="course-desc" id="coursedesc"${desc ? '' : ' style="display:none"'}>${desc}</p>
   <div class="vframe" id="vframe">
     <div class="play-flash" id="playFlash" aria-hidden="true">&#9654;</div>
+    <button class="fs-float" id="fsFloat">&#x2715; Exit fullscreen</button>
     <video id="vid" preload="metadata">
       <source src="${videoFilename}" type="video/mp4"/>
       <track id="cctrack" kind="subtitles" label="Captions" src=""/>
@@ -2680,14 +2690,48 @@ function updateVol(){
   mb.innerHTML=vid.muted||vid.volume===0?'&#128263;':vid.volume<0.5?'&#128265;':'&#128266;';
   mb.setAttribute('aria-label',vid.muted||vid.volume===0?'Unmute':'Mute');
 }
-document.getElementById('fsb').addEventListener('click',()=>{
-  const shell=document.querySelector('.shell');
-  if(!document.fullscreenElement){
-    (shell.requestFullscreen||shell.webkitRequestFullscreen||shell.mozRequestFullScreen).call(shell);
+// ── Fullscreen: off → fullscreen with controls → video only (mouse/trackpad devices) → off ──
+const shellEl=document.querySelector('.shell');
+const fsb=document.getElementById('fsb');
+const fsFloat=document.getElementById('fsFloat');
+let fsFloatTimer=0;
+// Video-only needs a hovering pointer to bring the exit button back, so touch screens skip it
+const canHover=()=>!!(window.matchMedia&&matchMedia('(hover: hover) and (pointer: fine)').matches);
+const isFullscreen=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
+function exitFullscreen(){(document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen).call(document);}
+function updateFsbTitle(){
+  fsb.title=isFullscreen()?(canHover()?'Hide the controls and show only the video':'Exit full screen'):'Full screen';
+}
+// The exit button fades in on mouse movement or Tab, and hides again after 2.5 s
+function showFloat(){
+  if(!shellEl.classList.contains('fs-video-only'))return;
+  shellEl.classList.add('show-float');
+  clearTimeout(fsFloatTimer);
+  fsFloatTimer=setTimeout(()=>{if(document.activeElement!==fsFloat)shellEl.classList.remove('show-float');},2500);
+}
+function setVideoOnly(on){
+  shellEl.classList.toggle('fs-video-only',on);
+  if(on){showFloat();}
+  else{clearTimeout(fsFloatTimer);shellEl.classList.remove('show-float');}
+  updateFsbTitle();
+}
+fsb.addEventListener('click',()=>{
+  if(!isFullscreen()){
+    (shellEl.requestFullscreen||shellEl.webkitRequestFullscreen||shellEl.mozRequestFullScreen).call(shellEl);
+  }else if(canHover()&&!shellEl.classList.contains('fs-video-only')){
+    setVideoOnly(true);
   }else{
-    (document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen).call(document);
+    exitFullscreen();
   }
 });
+fsFloat.addEventListener('click',e=>{e.stopPropagation();exitFullscreen();});
+fsFloat.addEventListener('focus',showFloat);
+fsFloat.addEventListener('blur',showFloat);
+shellEl.addEventListener('mousemove',showFloat);
+document.addEventListener('keydown',e=>{if(e.key==='Tab')showFloat();});
+// When the video finishes, bring the controls back so the learner sees their completion status
+vid.addEventListener('ended',()=>{if(shellEl.classList.contains('fs-video-only'))setVideoOnly(false);});
+updateFsbTitle();
 (function(){
   const shell=document.querySelector('.shell');
   const vframe=document.querySelector('.vframe');
@@ -2710,6 +2754,7 @@ document.getElementById('fsb').addEventListener('click',()=>{
     if(bn)bn.style.display=isFS?'none':'';
     const lmsrow=document.querySelector('.lmsrow');
     if(lmsrow)lmsrow.style.display=isFS?'none':'';
+    if(!isFS)setVideoOnly(false);else updateFsbTitle();
   }
   document.addEventListener('fullscreenchange',onFSChange);
   document.addEventListener('webkitfullscreenchange',onFSChange);
@@ -2879,7 +2924,7 @@ fetch('captions.vtt')
 const vframe=document.getElementById('vframe');
 const playFlash=document.getElementById('playFlash');
 vframe.addEventListener('click',e=>{
-  if(e.target.closest('.controls'))return;
+  if(e.target.closest('.controls')||e.target.closest('.fs-float'))return;
   const wasPlaying=!vid.paused;
   if(vid.paused){vid.play();}else{vid.pause();}
   // Show the icon that reflects what just happened:
