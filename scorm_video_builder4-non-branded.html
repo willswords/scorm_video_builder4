@@ -2199,7 +2199,7 @@ vid.addEventListener('loadedmetadata',async ()=>{
     if(bm.time>1){
       resumeTime=bm.time;
       if(vid.paused)vid.currentTime=bm.time;
-      const pct=Math.round(frac()*100);
+      const pct=pctOf(frac());
       rsub.textContent='Position '+ft(bm.time)+' \u2014 '+pct+'% previously watched';
       rb.classList.add('on');
     }
@@ -2428,10 +2428,14 @@ document.getElementById('goToGapBtn').addEventListener('click',()=>{
 });
 
 vid.addEventListener('ended',()=>{
-  mark();updateStats();saveBookmark();
+  mark();
+  // Some files stop a fraction of a second before their stated length, so their last
+  // slots can never play. Count any slots after where playback ended (up to 2 s).
+  if(dur-vid.currentTime<2)for(let i=Math.max(0,Math.floor(vid.currentTime/GRAN));i<buckets.length;i++)buckets[i]=true;
+  updateStats();saveBookmark();
   // If video ended but threshold not yet met, show the incomplete nudge
   if(!done){
-    const pct=Math.round(frac()*100);
+    const pct=pctOf(frac());
     const needed=Math.round(THRESH*100);
     document.getElementById('xsub').textContent=
       'You have watched '+pct+'% — rewind and watch the remaining sections to reach '+needed+'%';
@@ -2459,9 +2463,11 @@ function mark(){
 }
 
 function frac(){return buckets.length?buckets.filter(Boolean).length/buckets.length:0;}
+// Rounded down, so a percentage is only shown once it's actually reached (99.6% shows 99%, not 100%)
+function pctOf(f){return Math.floor(f*100+1e-9);}
 
 function updateStats(){
-  const f=frac(),p=Math.round(f*100);
+  const f=frac(),p=pctOf(f);
   pw.textContent=p+'%';
   pw.className='sval'+(f>=THRESH?' done':'');
   if(f>=THRESH&&!done)markComplete();

@@ -35,8 +35,11 @@ A video player with playback controls, a progress bar, speed control, fullscreen
 | `scorm_video_builder4.html` | Main packager — Burns & McDonnell branded theme included |
 | `scorm_video_builder4-non-branded.html` | Same tool, no B&M branding — use for other clients |
 | `index.html` | Pre-built generic player — drop it into a package folder alongside `video.mp4` instead of building through the tool |
-| `scorm-test-lms/` | Local SCORM 1.2 test LMS for checking any package before uploading it — see its README |
 | `CHANGELOG.md` | What changed in each update |
+
+## Testing a package before uploading it
+
+The **SCORM Test LMS** is a local test LMS (SCORM 1.2, SCORM 2004 and xAPI) for checking any package, from this tool or others, before you upload it to your LMS. It's kept in its own repository: [github.com/willswords/scorm-test-lms](https://github.com/willswords/scorm-test-lms). See its [README](https://github.com/willswords/scorm-test-lms#readme) for how to run it, and [STORYLINE-NAVIGATION.md](https://github.com/willswords/scorm-test-lms/blob/main/STORYLINE-NAVIGATION.md) for how navigation locking works in Storyline packages (menu, seekbar, Prev/Next).
 
 ## Notes
 
