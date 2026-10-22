@@ -17,7 +17,7 @@ Packages built before this change keep the old player. To update one, import it 
 
 ### SCORM Test LMS
 
-The SCORM Test LMS now has its own repository: [github.com/willswords/scorm-test-lms](https://github.com/willswords/scorm-test-lms). Its README and the Storyline navigation guide are there too.
+The SCORM Test LMS now has its own repository: [github.com/willswords/scorm-test-lms](https://github.com/willswords/scorm-test-lms). Its README and the Storyline navigation guide are there too, and later changes to it are recorded in its own [change log](https://github.com/willswords/scorm-test-lms/blob/main/CHANGELOG.md).
 
 If the test LMS was running when you updated its files, restart it (Ctrl+C, then run it again). **Close package** and the temp-file cleanup need the updated server; the other changes only need a page reload.
 
