@@ -8,6 +8,7 @@ Packages built before this change keep the old player. To update one, import it 
 
 - **The "Mark as complete" button can wait until part of the video is watched.** When **Allow learner to mark themselves complete** is ticked, a new slider sets when the button appears: from the start (the default, as before) or after a chosen percentage has been watched. Skipped parts don't count, the same as for the pass threshold. The value must be below the pass threshold. It's saved as `<self-complete-after>` in `config.xml` (0 = from the start); a `config.xml` without it shows the button from the start.
 - **The "Mark as complete" button is now above the Watched / Needed / Status bar**, instead of below it.
+- **The video no longer moves while the learner watches.** The player used to be centred vertically in the window, so whenever something appeared or disappeared below the video (the resume message, the "Mark as complete" button, the completion or "not finished" banners, the resource links), the video shifted up or down. The player is now aligned to the top of the window, and the space for the scrollbar is always reserved, so the video also doesn't narrow when the page becomes long enough to scroll.
 
 ## 2026-10-21
 

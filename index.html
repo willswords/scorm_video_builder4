@@ -22,9 +22,12 @@
   --watched-num:#059669;
   --warn-clr:#b45309;--warn-bg:rgba(180,83,9,0.08);--warn-border:rgba(180,83,9,0.35);--warn-sub:rgba(180,83,9,0.70)
 }
+/* Keep the video still: always reserve the scrollbar's space, so the video doesn't narrow when the page starts scrolling */
+html{scrollbar-gutter:stable}
+/* Top-aligned, not centred, so banners and buttons appearing below the video don't move it */
 body{background:var(--bg);color:var(--text);font-family:var(--sans);
   min-height:100vh;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;padding:20px}
+  justify-content:flex-start;padding:20px}
 .shell{width:100%;max-width:900px;display:flex;flex-direction:column;gap:0}
 .hdr{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
 .hdr h1{font-size:1rem;font-weight:500;letter-spacing:.02em;flex:1;min-width:0;
