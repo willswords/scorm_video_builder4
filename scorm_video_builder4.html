@@ -1496,6 +1496,7 @@ function buildPlayerHTML(title, videoFilename, vttContent, desc, threshold, allo
 ${themeCss}
 /* Keep the video still: always reserve the scrollbar's space, so the video doesn't narrow when the page starts scrolling */
 html{scrollbar-gutter:stable}
+html:has(:fullscreen){scrollbar-gutter:auto}
 /* Top-aligned, not centred, so banners and buttons appearing below the video don't move it */
 body{background:var(--bg);color:var(--text);font-family:var(--sans);
   min-height:100vh;display:flex;flex-direction:column;align-items:center;
@@ -1519,7 +1520,7 @@ video{display:block;width:100%;max-height:500px;object-fit:contain;background:#0
 .shell:fullscreen,.shell:-webkit-full-screen,.shell:-moz-full-screen{
   max-width:none;width:100vw;height:100%;display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
 .shell:fullscreen .vframe,.shell:-webkit-full-screen .vframe,.shell:-moz-full-screen .vframe{
-  flex:1;min-height:0;border-radius:0;width:100%}
+  flex:1;min-height:0;border-radius:0;border:none;width:100%}
 .shell:fullscreen video,.shell:-webkit-full-screen video,.shell:-moz-full-screen video{
   max-height:100%;height:100%;width:100%}
 .shell:fullscreen .ext-resources,.shell:-webkit-full-screen .ext-resources,.shell:-moz-full-screen .ext-resources{display:none}
@@ -2778,6 +2779,8 @@ updateFsbTitle();
   const vframe=document.querySelector('.vframe');
   function onFSChange(){
     const isFS=!!(document.fullscreenElement||document.webkitFullscreenElement);
+    // No scrollbar in fullscreen, so don't reserve space for one (it showed as a strip down the right edge)
+    document.documentElement.style.scrollbarGutter=isFS?'auto':'';
     shell.style.maxWidth=isFS?'none':'';
     shell.style.width=isFS?'100vw':'';
     shell.style.height=isFS?'100vh':'';
@@ -2785,6 +2788,7 @@ updateFsbTitle();
     vframe.style.flex=isFS?'1':'';
     vframe.style.minHeight=isFS?'0':'';
     vframe.style.borderRadius=isFS?'0':'';
+    vframe.style.border=isFS?'none':'';
     vframe.style.width=isFS?'100%':'';
     vid.style.maxHeight=isFS?'100%':'';
     vid.style.height=isFS?'100%':'';
