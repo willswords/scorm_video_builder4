@@ -1,5 +1,14 @@
 # Change log
 
+## 2026-10-31
+
+### Video player and builder
+
+Packages built before this change keep the old player. To update one, import it into the builder (**Start from an existing package**) and build it again.
+
+- **The "Mark as complete" button can wait until part of the video is watched.** When **Allow learner to mark themselves complete** is ticked, a new slider sets when the button appears: from the start (the default, as before) or after a chosen percentage has been watched. Skipped parts don't count, the same as for the pass threshold. The value must be below the pass threshold. It's saved as `<self-complete-after>` in `config.xml` (0 = from the start); a `config.xml` without it shows the button from the start.
+- **The "Mark as complete" button is now above the Watched / Needed / Status bar**, instead of below it.
+
 ## 2026-10-21
 
 ### Video player

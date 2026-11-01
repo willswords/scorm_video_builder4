@@ -362,12 +362,12 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
     </div>
     <button class="rbtn" id="resumeBtn">Resume &#9654;</button>
   </div>
+  <button class="selfcomplete" id="selfCompleteBtn">&#10003; Mark as complete</button>
   <div class="stats">
     <div class="stat"><span class="slbl">Watched</span><span class="sval" id="pw">0%</span></div>
     <div class="stat"><span class="slbl">Needed</span><span class="sval" id="nd">100%</span></div>
     <div class="stat"><span class="slbl">Status</span><span class="sval" id="sv">Incomplete</span></div>
   </div>
-  <button class="selfcomplete" id="selfCompleteBtn">&#10003; Mark as complete</button>
   <div class="banner" id="bn" role="status">
     <span class="bico">&#10003;</span>
     <div>
@@ -537,6 +537,7 @@ const CFG={
   threshold:1,
   allowSelfComplete:false,
   enableAck:false,
+  selfCompleteAfter:0,
   ackText:"I confirm that I have watched this video and understand its content.",
   ackBtnLabel:"Acknowledge",
   ccDefaultOn:false,
@@ -600,6 +601,7 @@ const configReady=fetch('config.xml')
       const g=sel=>{const el=xdoc.querySelector(sel);return el?el.textContent.trim():null;};
       const thr=g('threshold');if(thr!==null){const n=parseFloat(thr);if(!isNaN(n))CFG.threshold=n/100;}
       const asc=g('allow-self-complete');if(asc!==null)CFG.allowSelfComplete=asc!=='false';
+      const sca=g('self-complete-after');if(sca!==null){const n=parseFloat(sca);if(!isNaN(n))CFG.selfCompleteAfter=Math.max(0,Math.min(100,n))/100;}
       const ccd=g('cc-default-on');if(ccd!==null)CFG.ccDefaultOn=ccd==='true';
       const ackEl=xdoc.querySelector('acknowledgment');
       if(ackEl){
@@ -970,10 +972,13 @@ const selfCompleteBtn=document.getElementById('selfCompleteBtn');
 const scOverlay=document.getElementById('scOverlay');
 const scCancelBtn=document.getElementById('scCancelBtn');
 const scConfirmBtn=document.getElementById('scConfirmBtn');
-// Show the button once config.xml and the learner's LMS status are known (not if already complete)
-lmsReady.then(()=>{
-  if(!done&&CFG.allowSelfComplete)selfCompleteBtn.classList.add('visible');
-});
+// Show the button once config.xml and the learner's LMS status are known (not if already complete),
+// and only after the configured share of the video has been watched (skipped parts don't count)
+let scReady=false;
+function updateSelfCompleteBtn(){
+  if(scReady&&!done&&CFG.allowSelfComplete&&frac()>=(CFG.selfCompleteAfter||0))selfCompleteBtn.classList.add('visible');
+}
+lmsReady.then(()=>{scReady=true;updateSelfCompleteBtn();});
 selfCompleteBtn.addEventListener('click',()=>{
   if(done)return;
   openOverlay(scOverlay,scCancelBtn);
@@ -1043,6 +1048,7 @@ function updateStats(){
   pw.textContent=p+'%';
   pw.className='sval'+(f>=THRESH?' done':'');
   if(f>=THRESH&&!done)markComplete();
+  updateSelfCompleteBtn();
 }
 
 function updateTime(){td.textContent=ft(vid.currentTime)+' / '+ft(dur);}

@@ -758,9 +758,16 @@
       <input type="checkbox" id="allowSelfComplete"/>
       <div class="field-check-label">
         <span class="field-check-title">Allow learner to mark themselves complete</span>
-        <span class="field-check-sub">Shows a button, from the moment the module opens, that lets the learner send completion before reaching the watch threshold</span>
+        <span class="field-check-sub">Shows a button that lets the learner send completion before reaching the watch threshold</span>
       </div>
     </label>
+    <div class="ack-options" id="selfCompleteOptions" style="display:none;flex-direction:column;gap:10px;">
+      <div class="field">
+        <label for="selfCompleteAfterSlider">Show the button — <span id="selfCompleteAfterDisplay">from the start</span></label>
+        <input type="range" id="selfCompleteAfterSlider" min="0" max="99" value="0" style="width:100%;margin-top:4px;"/>
+        <span class="field-check-sub">Skipped parts don’t count. Must be below the pass threshold.</span>
+      </div>
+    </div>
     <label class="field-check">
       <input type="checkbox" id="enableAck"/>
       <div class="field-check-label">
@@ -899,7 +906,21 @@ const THRESHOLD_KEY = 'scormVideoBuilder.threshold';
 function showThreshold() {
   thresholdDisplay.textContent = thresholdSlider.value + '%';
   document.getElementById('subtitleThreshold').textContent = thresholdSlider.value + '%';
+  // The self-complete button must appear before the threshold completes the module
+  selfCompleteAfterSlider.max = thresholdSlider.value - 1;
+  showSelfCompleteAfter();
 }
+// When the "Mark as complete" button appears: 0 = from the start, else after that % has been watched
+const selfCompleteAfterSlider = document.getElementById('selfCompleteAfterSlider');
+function showSelfCompleteAfter() {
+  const v = parseInt(selfCompleteAfterSlider.value, 10);
+  document.getElementById('selfCompleteAfterDisplay').textContent = v > 0 ? 'after ' + v + '% watched' : 'from the start';
+}
+selfCompleteAfterSlider.addEventListener('input', showSelfCompleteAfter);
+function showSelfCompleteOptions() {
+  document.getElementById('selfCompleteOptions').style.display = document.getElementById('allowSelfComplete').checked ? 'flex' : 'none';
+}
+document.getElementById('allowSelfComplete').addEventListener('change', showSelfCompleteOptions);
 try {
   const saved = parseInt(localStorage.getItem(THRESHOLD_KEY), 10);
   if (saved >= 1 && saved <= 100) { thresholdSlider.value = saved; showThreshold(); }
@@ -1310,6 +1331,11 @@ async function importPackage(zipFile) {
     const thr = parseInt(g('threshold'), 10);
     if (thr >= 1 && thr <= 100) { thresholdSlider.value = thr; showThreshold(); }
     document.getElementById('allowSelfComplete').checked = g('allow-self-complete') === 'true';
+    showSelfCompleteOptions();
+    const sca = parseInt(g('self-complete-after'), 10);
+    selfCompleteAfterSlider.value = sca >= 0 && sca <= 99 ? sca : 0;
+    showSelfCompleteAfter();
+    if (sca > 0 && parseInt(selfCompleteAfterSlider.value, 10) !== sca) notes.push('The “Mark as complete” button was set to appear after ' + sca + '% watched, which isn’t below the pass threshold, so it’s now ' + selfCompleteAfterSlider.value + '%.');
     document.getElementById('ccDefaultOn').checked = g('cc-default-on') !== 'false';
     const ackEl = cfg.querySelector('acknowledgment');
     const ackOn = !!ackEl && ackEl.getAttribute('enabled') === 'true';
@@ -1384,7 +1410,7 @@ function escHTML(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/`/g,'&#96;');
 }
-function buildPlayerHTML(title, videoFilename, vttContent, desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, links, theme) {
+function buildPlayerHTML(title, videoFilename, vttContent, desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, links, theme, selfCompleteAfter) {
   links = links || [];
   title = escHTML(title);
   desc  = escHTML(desc||"");
@@ -1808,12 +1834,12 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
     </div>
     <button class="rbtn" id="resumeBtn">Resume &#9654;</button>
   </div>
+  <button class="selfcomplete" id="selfCompleteBtn">&#10003; Mark as complete</button>
   <div class="stats">
     <div class="stat"><span class="slbl">Watched</span><span class="sval" id="pw">0%</span></div>
     <div class="stat"><span class="slbl">Needed</span><span class="sval" id="nd">${Math.round(threshold * 100)}%</span></div>
     <div class="stat"><span class="slbl">Status</span><span class="sval" id="sv">Incomplete</span></div>
   </div>
-  <button class="selfcomplete" id="selfCompleteBtn">&#10003; Mark as complete</button>
   <div class="banner" id="bn" role="status">
     <span class="bico">&#10003;</span>
     <div>
@@ -1983,6 +2009,7 @@ const CFG={
   threshold:${threshold},
   allowSelfComplete:${allowSelfComplete?'true':'false'},
   enableAck:${enableAck?'true':'false'},
+  selfCompleteAfter:${selfCompleteAfter||0},
   ackText:${jsLit(ackTextRaw)},
   ackBtnLabel:${jsLit(ackBtnLabelRaw)},
   ccDefaultOn:${ccDefaultOn?'true':'false'},
@@ -2046,6 +2073,7 @@ const configReady=fetch('config.xml')
       const g=sel=>{const el=xdoc.querySelector(sel);return el?el.textContent.trim():null;};
       const thr=g('threshold');if(thr!==null){const n=parseFloat(thr);if(!isNaN(n))CFG.threshold=n/100;}
       const asc=g('allow-self-complete');if(asc!==null)CFG.allowSelfComplete=asc!=='false';
+      const sca=g('self-complete-after');if(sca!==null){const n=parseFloat(sca);if(!isNaN(n))CFG.selfCompleteAfter=Math.max(0,Math.min(100,n))/100;}
       const ccd=g('cc-default-on');if(ccd!==null)CFG.ccDefaultOn=ccd==='true';
       const ackEl=xdoc.querySelector('acknowledgment');
       if(ackEl){
@@ -2416,10 +2444,13 @@ const selfCompleteBtn=document.getElementById('selfCompleteBtn');
 const scOverlay=document.getElementById('scOverlay');
 const scCancelBtn=document.getElementById('scCancelBtn');
 const scConfirmBtn=document.getElementById('scConfirmBtn');
-// Show the button once config.xml and the learner's LMS status are known (not if already complete)
-lmsReady.then(()=>{
-  if(!done&&CFG.allowSelfComplete)selfCompleteBtn.classList.add('visible');
-});
+// Show the button once config.xml and the learner's LMS status are known (not if already complete),
+// and only after the configured share of the video has been watched (skipped parts don't count)
+let scReady=false;
+function updateSelfCompleteBtn(){
+  if(scReady&&!done&&CFG.allowSelfComplete&&frac()>=(CFG.selfCompleteAfter||0))selfCompleteBtn.classList.add('visible');
+}
+lmsReady.then(()=>{scReady=true;updateSelfCompleteBtn();});
 selfCompleteBtn.addEventListener('click',()=>{
   if(done)return;
   openOverlay(scOverlay,scCancelBtn);
@@ -2489,6 +2520,7 @@ function updateStats(){
   pw.textContent=p+'%';
   pw.className='sval'+(f>=THRESH?' done':'');
   if(f>=THRESH&&!done)markComplete();
+  updateSelfCompleteBtn();
 }
 
 function updateTime(){td.textContent=ft(vid.currentTime)+' / '+ft(dur);}
@@ -3021,7 +3053,7 @@ function buildManifest(title, hasCaptions, durationSecs, desc, idOverride) {
 }
 
 // ─── Build player config XML ──────────────────────────────────────────────
-function buildConfigXml(title, videoFilename, desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, links, theme) {
+function buildConfigXml(title, videoFilename, desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, links, theme, selfCompleteAfter) {
   links = links || [];
   const x = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const linksXml = links.length
@@ -3038,6 +3070,7 @@ function buildConfigXml(title, videoFilename, desc, threshold, allowSelfComplete
     theme               - Player theme: bmcd | clean | a11y | techie
     threshold           - Completion percentage required (1-100)
     allow-self-complete - true | false  (show "Mark as complete" button)
+    self-complete-after - % watched before that button appears (0-99; 0 = from the start)
     cc-default-on       - true | false  (captions on by default)
     acknowledgment      - enabled="true|false"; contains text and button-label children
     links               - External resource links shown below the player
@@ -3048,6 +3081,7 @@ function buildConfigXml(title, videoFilename, desc, threshold, allowSelfComplete
   <theme>${x(theme)}</theme>
   <threshold>${Math.round(threshold * 100)}</threshold>
   <allow-self-complete>${allowSelfComplete ? 'true' : 'false'}</allow-self-complete>
+  <self-complete-after>${Math.round((selfCompleteAfter || 0) * 100)}</self-complete-after>
   <cc-default-on>${ccDefaultOn ? 'true' : 'false'}</cc-default-on>
   <acknowledgment enabled="${enableAck ? 'true' : 'false'}">
     <text>${x(ackText||'I confirm that I have watched this video and understand its content.')}</text>
@@ -3155,6 +3189,7 @@ generateBtn.addEventListener('click', async () => {
   const desc = courseDesc.value.trim();
   const threshold = Math.max(1, Math.min(100, parseInt(thresholdSlider.value, 10))) / 100;
   const allowSelfComplete = document.getElementById('allowSelfComplete').checked;
+  const selfCompleteAfter = Math.max(0, Math.min(99, parseInt(selfCompleteAfterSlider.value, 10) || 0)) / 100;
   const ccDefaultOn = document.getElementById('ccDefaultOn').checked;
   const enableAck = document.getElementById('enableAck').checked;
   const ackText = document.getElementById('ackText').value.trim() || 'I confirm that I have watched this video and understand its content.';
@@ -3195,10 +3230,10 @@ generateBtn.addEventListener('click', async () => {
     }
     const hasCaptions = !!vttText;
 
-    const playerHTML = buildPlayerHTML(title, 'video.mp4', vttText, desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, externalLinks, playerTheme);
+    const playerHTML = buildPlayerHTML(title, 'video.mp4', vttText, desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, externalLinks, playerTheme, selfCompleteAfter);
     const keepImportedId = importedManifestId && document.getElementById('keepId').checked;
     const manifest = buildManifest(title, hasCaptions, durationSecs, desc, keepImportedId ? importedManifestId : null);
-    const configXml = buildConfigXml(title, 'video.mp4', desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, externalLinks, playerTheme);
+    const configXml = buildConfigXml(title, 'video.mp4', desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, externalLinks, playerTheme, selfCompleteAfter);
 
     const entries = [
       { name: 'imsmanifest.xml', data: manifest },
