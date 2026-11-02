@@ -1,5 +1,19 @@
 # Change log
 
+## 2026-11-02
+
+### Video player
+
+Packages built before this change keep the old player. To update one, import it into the builder (**Start from an existing package**) and build it again.
+
+- **F is a keyboard shortcut for the Fullscreen button.** It does exactly what clicking the button does: the first press goes fullscreen, the second shows only the video (on computers with a mouse), and the third exits. Ctrl+F still opens the browser's Find, and typing "f" in a text box doesn't trigger it. The button's tooltip mentions the shortcut.
+- **More keyboard shortcuts:**
+  - **↑ / ↓** turn the volume up or down in steps of 10%, and move the volume slider to match. Turning it up unmutes. (While the seek bar has keyboard focus, ↑ / ↓ still seek, as before.)
+  - **M** mutes or unmutes, like the speaker button.
+  - **C** turns captions on or off, like the CC button. It does nothing in packages without captions.
+  - **?** opens a list of all the shortcuts. Esc or **Close** closes it. The list leaves out C when the package has no captions.
+  - Like F, the letter shortcuts don't interfere with browser shortcuts such as Ctrl+C, don't trigger while typing in a box or while a dialog is open, and only act once when a key is held down. The mute and CC buttons' tooltips mention their shortcuts.
+
 ## 2026-10-31
 
 ### Video player and builder
@@ -9,6 +23,7 @@ Packages built before this change keep the old player. To update one, import it 
 - **The "Mark as complete" button can wait until part of the video is watched.** When **Allow learner to mark themselves complete** is ticked, a new slider sets when the button appears: from the start (the default, as before) or after a chosen percentage has been watched. Skipped parts don't count, the same as for the pass threshold. The value must be below the pass threshold. It's saved as `<self-complete-after>` in `config.xml` (0 = from the start); a `config.xml` without it shows the button from the start.
 - **The "Mark as complete" button is now above the Watched / Needed / Status bar**, instead of below it.
 - **The video no longer moves while the learner watches.** The player used to be centred vertically in the window, so whenever something appeared or disappeared below the video (the resume message, the "Mark as complete" button, the completion or "not finished" banners, the resource links), the video shifted up or down. The player is now aligned to the top of the window, and the space for the scrollbar is always reserved, so the video also doesn't narrow when the page becomes long enough to scroll. In fullscreen there's no scrollbar, so no space is reserved there. (An earlier build reserved it in fullscreen too, which showed as a strip down the right edge of the screen.)
+- **No border around the video in fullscreen.** Fullscreen with controls now drops the thin border around the video, as video-only fullscreen already did.
 
 ## 2026-10-21
 

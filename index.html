@@ -210,6 +210,12 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
 .mbtn:hover{opacity:.8}
 .mbtn-cancel{background:var(--surface2);border-color:var(--border);color:var(--muted)}
 .mbtn-exit{background:var(--exit-bg);border-color:var(--exit-border);color:var(--exit)}
+.kbd-list{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;margin:0;font-size:.8rem;align-items:center}
+.kbd-row{display:contents}
+.kbd-list dt{white-space:nowrap}
+.kbd-list dd{margin:0;color:var(--muted)}
+.kbd-list kbd{display:inline-block;min-width:1.7em;text-align:center;font-family:var(--mono);font-size:.72rem;
+  color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 6px}
 .dbg-panel{display:none;position:fixed;bottom:0;left:0;right:0;
   background:#0a0a0f;border-top:2px solid var(--accent);
   z-index:9999;max-height:220px;flex-direction:column;font-family:var(--mono)}
@@ -295,6 +301,24 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
       </div>
     </div>
   </div>
+  <div class="overlay" id="kbdOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="kbdTitle">
+      <div class="modal-title" id="kbdTitle">Keyboard shortcuts</div>
+      <dl class="kbd-list">
+        <div class="kbd-row"><dt><kbd>Space</kbd></dt><dd>Play / pause</dd></div>
+        <div class="kbd-row"><dt><kbd>&larr;</kbd> <kbd>&rarr;</kbd></dt><dd>Back / forward 5 seconds</dd></div>
+        <div class="kbd-row"><dt><kbd>&uarr;</kbd> <kbd>&darr;</kbd></dt><dd>Volume up / down</dd></div>
+        <div class="kbd-row"><dt><kbd>M</kbd></dt><dd>Mute / unmute</dd></div>
+        <div class="kbd-row" id="kbdCcRow"><dt><kbd>C</kbd></dt><dd>Captions on / off</dd></div>
+        <div class="kbd-row"><dt><kbd>F</kbd></dt><dd>Fullscreen (press again to change or leave it)</dd></div>
+        <div class="kbd-row"><dt><kbd>Esc</kbd></dt><dd>Close a dialog or leave fullscreen</dd></div>
+        <div class="kbd-row"><dt><kbd>?</kbd></dt><dd>Show this list</dd></div>
+      </dl>
+      <div class="modal-actions">
+        <button class="mbtn mbtn-cancel" id="kbdCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
   <div class="overlay" id="ackOverlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="ackTitle"><div class="modal-title" id="ackTitle">Before you go</div><p class="ack-modal-body" id="ackModalBody">I confirm that I have watched this video and understand its content.</p><div class="modal-actions"><button class="mbtn mbtn-cancel" id="ackDeclineBtn">Cancel</button><button class="mbtn mbtn-exit" id="ackConfirmBtn">Acknowledge</button></div></div></div>
   <div class="hdr">
     <h1>Video Course</h1>
@@ -324,11 +348,11 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
       <button class="rwbtn" id="rwb" title="Rewind 5 seconds" aria-label="Rewind 5 seconds">&#x2212;5</button>
       <span class="timedisp" id="td">0:00 / 0:00</span>
       <div class="vrow">
-        <button class="vicon" id="mb" aria-label="Mute">&#128266;</button>
+        <button class="vicon" id="mb" aria-label="Mute" title="Mute (M)" aria-keyshortcuts="M">&#128266;</button>
         <input type="range" class="vslider" id="vs" min="0" max="1" step="0.05" value="1" aria-label="Volume"/>
       </div>
       <span style="flex:1"></span>
-      <button class="ccbtn" id="ccbtn" style="display:none" aria-label="Captions" aria-pressed="false">CC</button>
+      <button class="ccbtn" id="ccbtn" style="display:none" aria-label="Captions" aria-pressed="false" title="Captions (C)" aria-keyshortcuts="C">CC</button>
       <select class="speedsel" id="speedsel" title="Playback speed" aria-label="Playback speed">
         <option value="1" selected>1x</option>
         <option value="1.25">1.25x</option>
@@ -347,7 +371,7 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
           <button class="thopt hotdog-opt" data-th="hotdog" onclick="applyTheme('hotdog')" style="display:none"><span class="thdot" style="background:#FF0000;outline:1.5px solid #FFFF00;outline-offset:1px"></span>&#127991; Hot Dog Stand</button>
         </div>
       </div>
-      <button class="fbtn" id="fsb">&#9974; Fullscreen</button>
+      <button class="fbtn" id="fsb" aria-keyshortcuts="F">&#9974; Fullscreen</button>
     </div>
   </div>
   <div class="incompletebanner" id="xb">
@@ -933,6 +957,7 @@ document.addEventListener('keydown',e=>{
   if(exitOverlay.classList.contains('on'))cancelExitBtn.click();
   else if(scOverlay.classList.contains('on'))scCancelBtn.click();
   else if(ackOverlay&&ackOverlay.classList.contains('on')&&ackDeclineBtn)ackDeclineBtn.click();
+  else if(kbdOverlay.classList.contains('on'))kbdCloseBtn.click();
 });
 
 // ── Canvas seekbar ─────────────────────────────────────────────────────────
@@ -1222,7 +1247,8 @@ SCORM.finish=function(){
   _origFinish();
 };
 
-// ── Keyboard: Space = play/pause, Left/Right = back/forward 5s ──────────────
+// ── Keyboard: Space = play/pause, Left/Right = back/forward 5s, Up/Down = volume,
+//    M = mute, C = captions, F = Fullscreen button, ? = list of shortcuts ──
 function seekBy(sec){
   if(!dur)return;
   vid.currentTime=Math.max(0,Math.min(dur,vid.currentTime+sec));
@@ -1239,8 +1265,38 @@ document.addEventListener('keydown',e=>{
     e.preventDefault();seekBy(-5);
   } else if(e.key==='ArrowRight'){
     e.preventDefault();seekBy(5);
+  } else if(e.key==='ArrowUp'||e.key==='ArrowDown'){
+    e.preventDefault();changeVolume(e.key==='ArrowUp'?0.1:-0.1);
+  } else if(e.ctrlKey||e.altKey||e.metaKey||e.repeat){
+    // Leave browser shortcuts (Ctrl+F etc.) alone, and act once per key press
+  } else if(e.key==='f'||e.key==='F'){
+    // Same as clicking the button, including its fullscreen → video only → exit cycle
+    e.preventDefault();fsb.click();
+  } else if(e.key==='m'||e.key==='M'){
+    e.preventDefault();mb.click();
+  } else if(e.key==='c'||e.key==='C'){
+    // Only when the package has captions (the CC button is shown)
+    if(ccbtn&&ccbtn.style.display!=='none'){e.preventDefault();ccbtn.click();}
+  } else if(e.key==='?'){
+    e.preventDefault();openShortcuts();
   }
 });
+// Volume in steps, kept in sync with the volume slider; turning it up unmutes
+function changeVolume(d){
+  const v=Math.round(Math.max(0,Math.min(1,vid.volume+d))*100)/100;
+  vid.volume=v;vs.value=v;
+  vid.muted=v===0;
+  updateVol();
+}
+// ── Keyboard shortcuts dialog (?) ──
+const kbdOverlay=document.getElementById('kbdOverlay');
+const kbdCloseBtn=document.getElementById('kbdCloseBtn');
+function openShortcuts(){
+  // Captions only apply when the package has them
+  document.getElementById('kbdCcRow').style.display=ccbtn&&ccbtn.style.display!=='none'?'':'none';
+  openOverlay(kbdOverlay,kbdCloseBtn);
+}
+kbdCloseBtn.addEventListener('click',()=>{kbdOverlay.classList.remove('on');});
 // Seek bar as a keyboard slider (focused via Tab)
 sw.addEventListener('keydown',e=>{
   if(!dur)return;
@@ -1270,7 +1326,7 @@ const canHover=()=>!!(window.matchMedia&&matchMedia('(hover: hover) and (pointer
 const isFullscreen=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
 function exitFullscreen(){(document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen).call(document);}
 function updateFsbTitle(){
-  fsb.title=isFullscreen()?(canHover()?'Hide the controls and show only the video':'Exit full screen'):'Full screen';
+  fsb.title=(isFullscreen()?(canHover()?'Hide the controls and show only the video':'Exit full screen'):'Full screen')+' (F)';
 }
 // The exit button fades in on mouse movement or Tab, and hides again after 2.5 s
 function showFloat(){
