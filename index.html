@@ -83,6 +83,8 @@ video{display:block;width:100%;max-height:500px;object-fit:contain;background:#0
   box-shadow:0 4px 20px rgba(0,0,0,.6);z-index:10;clip-path:inset(0 round 6px)}
 .scrub-prev.on{display:block}
 .crow{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;min-width:0}
+.crow-gap{flex:1}
+.crow button{white-space:nowrap}
 .pbtn{width:38px;height:38px;background:var(--surface2);border:1px solid var(--border);
   color:var(--text);border-radius:50%;display:flex;align-items:center;
   justify-content:center;font-size:14px;cursor:pointer;flex-shrink:0;transition:background .15s}
@@ -146,6 +148,27 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
   color:var(--text);transition:color .3s}
 .sval.done{color:var(--watched)}
 #pw{color:var(--watched-num)}
+/* Phones and narrow windows: the controls don't fit on one line, so CC, speed, Theme and
+   Fullscreen move to a second line, and the stats get a little tighter so "Incomplete" fits */
+@media (max-width:680px){
+  body{padding:12px}
+  .crow{flex-wrap:wrap;row-gap:10px}
+  .crow-gap{flex-basis:100%;height:0}
+  .stat{padding:10px;min-width:0}
+  .sval{font-size:1rem}
+}
+/* Small phones: tighter controls so each group stays on one line, and the Status column
+   takes the width "Incomplete" needs */
+@media (max-width:400px){
+  .controls{padding:12px}
+  .crow{gap:6px}
+  .fbtn{padding:6px 8px}
+  .ccbtn,.themebtn{padding:6px 7px}
+  input[type=range].vslider{width:56px}
+  .stats{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}
+  .stat{padding:8px}
+  .slbl{letter-spacing:.04em}
+}
 .banner{display:none;align-items:center;gap:12px;
   background:var(--watched-dim);border:1px solid var(--watched-border);
   border-radius:7px;padding:12px 16px;margin-top:8px}
@@ -351,7 +374,7 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
         <button class="vicon" id="mb" aria-label="Mute" title="Mute (M)" aria-keyshortcuts="M">&#128266;</button>
         <input type="range" class="vslider" id="vs" min="0" max="1" step="0.05" value="1" aria-label="Volume"/>
       </div>
-      <span style="flex:1"></span>
+      <span class="crow-gap"></span>
       <button class="ccbtn" id="ccbtn" style="display:none" aria-label="Captions" aria-pressed="false" title="Captions (C)" aria-keyshortcuts="C">CC</button>
       <select class="speedsel" id="speedsel" title="Playback speed" aria-label="Playback speed">
         <option value="1" selected>1x</option>
@@ -393,7 +416,7 @@ select.speedsel.active{color:var(--active-clr);border-color:var(--active-border)
   <button class="selfcomplete" id="selfCompleteBtn">&#10003; Mark as complete</button>
   <div class="stats">
     <div class="stat"><span class="slbl">Watched</span><span class="sval" id="pw">0%</span></div>
-    <div class="stat"><span class="slbl">Needed</span><span class="sval" id="nd">100%</span></div>
+    <div class="stat"><span class="slbl" id="ndLbl">Needed</span><span class="sval" id="nd">100%</span></div>
     <div class="stat"><span class="slbl">Status</span><span class="sval" id="sv">Incomplete</span></div>
   </div>
   <div class="banner" id="bn" role="status">
@@ -578,6 +601,9 @@ function applyConfigToUI(){
   THRESH=CFG.threshold;
   const ndEl=document.getElementById('nd');
   if(ndEl)ndEl.textContent=Math.round(CFG.threshold*100)+'%';
+  // With self-complete the threshold isn't required, it's where completion happens on its own
+  const ndLblEl=document.getElementById('ndLbl');
+  if(ndLblEl)ndLblEl.textContent=CFG.allowSelfComplete?'Autocompletes at':'Needed';
   // Banner text
   const bnTitleEl=document.getElementById('bnTitle');
   const bnSubEl=document.getElementById('bnSub');

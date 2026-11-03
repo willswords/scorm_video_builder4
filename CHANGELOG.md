@@ -1,5 +1,17 @@
 # Change log
 
+## 2026-11-03
+
+### Video player
+
+Packages built before this change keep the old player. To update one, import it into the builder (**Start from an existing package**) and build it again.
+
+- **"Needed" becomes "Autocompletes at" when learners can mark themselves complete.** With **Allow learner to mark themselves complete** on, the learner doesn't have to reach the threshold, so the stat under the video now reads "Autocompletes at" instead of "Needed". The percentage is unchanged. The label follows `<allow-self-complete>` in `config.xml`, so changing that setting after packaging changes the label too.
+- **The player fits phones and narrow windows.** Below about 680px wide, the controls didn't fit on one line, so the CC, speed, Theme and Fullscreen buttons stuck out past the right edge and the page scrolled sideways. Just above that, the Theme and Fullscreen buttons squashed their text onto two lines. Now:
+  - In windows up to 680px wide, the controls use two lines: play, rewind, time and volume on the first; CC, speed, Theme and Fullscreen on the second.
+  - Button labels no longer wrap inside the buttons.
+  - On small phones (up to 400px), the controls and the Watched / Needed / Status boxes are a little tighter, so everything fits down to 320px wide without sideways scrolling.
+
 ## 2026-11-02
 
 ### Video player
