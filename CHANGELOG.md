@@ -6,6 +6,10 @@
 
 Packages built before this change keep the old player. To update one, import it into the builder (**Start from an existing package**) and build it again.
 
+- **New option: start playing automatically.** In the builder, **Start playing automatically** (off by default) makes the video play with sound as soon as the module opens. A returning learner resumes from their saved position, and a "Resumed from…" message shows for a few seconds. It's saved as `<autoplay>` in `config.xml`; a `config.xml` without it doesn't autoplay.
+  - Browsers only allow sound to start by itself in some situations. Chrome and Edge usually allow it when the learner has just clicked on the same website, for example **Launch** in an LMS that serves the course from its own address. Safari and Firefox block it by default, and some LMSs block it for courses served from a different address.
+  - When the browser blocks it, the player stays paused with its play button, exactly as without the option. It never falls back to playing muted, so learners can't watch without realising there's sound.
+  - Audio that starts by itself can talk over screen readers, which is one reason the option is off by default. The learner can always pause or mute (Space, M, or the buttons).
 - **"Needed" becomes "Autocompletes at" when learners can mark themselves complete.** With **Allow learner to mark themselves complete** on, the learner doesn't have to reach the threshold, so the stat under the video now reads "Autocompletes at" instead of "Needed". The percentage is unchanged. The label follows `<allow-self-complete>` in `config.xml`, so changing that setting after packaging changes the label too.
 - **The player fits phones and narrow windows.** Below about 680px wide, the controls didn't fit on one line, so the CC, speed, Theme and Fullscreen buttons stuck out past the right edge and the page scrolled sideways. Just above that, the Theme and Fullscreen buttons squashed their text onto two lines. Now:
   - In windows up to 680px wide, the controls use two lines: play, rewind, time and volume on the first; CC, speed, Theme and Fullscreen on the second.

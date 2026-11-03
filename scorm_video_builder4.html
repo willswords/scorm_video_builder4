@@ -769,6 +769,13 @@
       </div>
     </div>
     <label class="field-check">
+      <input type="checkbox" id="autoplay"/>
+      <div class="field-check-label">
+        <span class="field-check-title">Start playing automatically</span>
+        <span class="field-check-sub">Plays with sound when the module opens, from where the learner left off. If the browser blocks this (often in Safari and Firefox, and in some LMSs), the learner presses play as usual</span>
+      </div>
+    </label>
+    <label class="field-check">
       <input type="checkbox" id="enableAck"/>
       <div class="field-check-label">
         <span class="field-check-title">Show acknowledgement on exit after completion</span>
@@ -1337,6 +1344,7 @@ async function importPackage(zipFile) {
     showSelfCompleteAfter();
     if (sca > 0 && parseInt(selfCompleteAfterSlider.value, 10) !== sca) notes.push('The “Mark as complete” button was set to appear after ' + sca + '% watched, which isn’t below the pass threshold, so it’s now ' + selfCompleteAfterSlider.value + '%.');
     document.getElementById('ccDefaultOn').checked = g('cc-default-on') !== 'false';
+    document.getElementById('autoplay').checked = g('autoplay') === 'true';
     const ackEl = cfg.querySelector('acknowledgment');
     const ackOn = !!ackEl && ackEl.getAttribute('enabled') === 'true';
     document.getElementById('enableAck').checked = ackOn;
@@ -1410,7 +1418,7 @@ function escHTML(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/`/g,'&#96;');
 }
-function buildPlayerHTML(title, videoFilename, vttContent, desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, links, theme, selfCompleteAfter) {
+function buildPlayerHTML(title, videoFilename, vttContent, desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, links, theme, selfCompleteAfter, autoplay) {
   links = links || [];
   title = escHTML(title);
   desc  = escHTML(desc||"");
@@ -2064,6 +2072,7 @@ const CFG={
   ackText:${jsLit(ackTextRaw)},
   ackBtnLabel:${jsLit(ackBtnLabelRaw)},
   ccDefaultOn:${ccDefaultOn?'true':'false'},
+  autoplay:${autoplay?'true':'false'},
   theme:${jsLit(theme)},
   links:${jsLit(links)}
 };
@@ -2129,6 +2138,7 @@ const configReady=fetch('config.xml')
       const asc=g('allow-self-complete');if(asc!==null)CFG.allowSelfComplete=asc!=='false';
       const sca=g('self-complete-after');if(sca!==null){const n=parseFloat(sca);if(!isNaN(n))CFG.selfCompleteAfter=Math.max(0,Math.min(100,n))/100;}
       const ccd=g('cc-default-on');if(ccd!==null)CFG.ccDefaultOn=ccd==='true';
+      const ap=g('autoplay');if(ap!==null)CFG.autoplay=ap==='true';
       const ackEl=xdoc.querySelector('acknowledgment');
       if(ackEl){
         CFG.enableAck=ackEl.getAttribute('enabled')==='true';
@@ -2313,7 +2323,25 @@ vid.addEventListener('loadedmetadata',async ()=>{
   }
   updateStats(); // also records completion if the restored progress already meets the threshold
   draw();
+  if(CFG.autoplay&&vid.paused)autoplayStart();
 });
+
+// Autoplay option: try to play with sound once the saved position is restored. Browsers can
+// refuse until the learner has clicked on the site; the player then just stays paused with its
+// play button, as it does without the option (no muted fallback, so audio is never missed unnoticed)
+function autoplayStart(){
+  const resumed=rb.classList.contains('on');
+  const p=vid.play();
+  if(!p||!p.then)return;
+  p.then(()=>{
+    if(!resumed)return;
+    // Already playing from the saved position, so the message stays briefly without its Resume button
+    rsub.textContent='Resumed from '+ft(resumeTime)+' — '+pctOf(frac())+'% previously watched';
+    resumeBtn.style.display='none';
+    rb.classList.add('on');
+    setTimeout(()=>{rb.classList.remove('on');resumeBtn.style.display='';},6000);
+  }).catch(()=>{});
+}
 
 resumeBtn.addEventListener('click',()=>{
   vid.currentTime=resumeTime;
@@ -3142,7 +3170,7 @@ function buildManifest(title, hasCaptions, durationSecs, desc, idOverride) {
 }
 
 // ─── Build player config XML ──────────────────────────────────────────────
-function buildConfigXml(title, videoFilename, desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, links, theme, selfCompleteAfter) {
+function buildConfigXml(title, videoFilename, desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, links, theme, selfCompleteAfter, autoplay) {
   links = links || [];
   const x = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const linksXml = links.length
@@ -3161,6 +3189,7 @@ function buildConfigXml(title, videoFilename, desc, threshold, allowSelfComplete
     allow-self-complete - true | false  (show "Mark as complete" button)
     self-complete-after - % watched before that button appears (0-99; 0 = from the start)
     cc-default-on       - true | false  (captions on by default)
+    autoplay            - true | false  (start playing when the module opens, if the browser allows it)
     acknowledgment      - enabled="true|false"; contains text and button-label children
     links               - External resource links shown below the player
 -->
@@ -3172,6 +3201,7 @@ function buildConfigXml(title, videoFilename, desc, threshold, allowSelfComplete
   <allow-self-complete>${allowSelfComplete ? 'true' : 'false'}</allow-self-complete>
   <self-complete-after>${Math.round((selfCompleteAfter || 0) * 100)}</self-complete-after>
   <cc-default-on>${ccDefaultOn ? 'true' : 'false'}</cc-default-on>
+  <autoplay>${autoplay ? 'true' : 'false'}</autoplay>
   <acknowledgment enabled="${enableAck ? 'true' : 'false'}">
     <text>${x(ackText||'I confirm that I have watched this video and understand its content.')}</text>
     <button-label>${x(ackBtnLabel||'Acknowledge')}</button-label>
@@ -3280,6 +3310,7 @@ generateBtn.addEventListener('click', async () => {
   const allowSelfComplete = document.getElementById('allowSelfComplete').checked;
   const selfCompleteAfter = Math.max(0, Math.min(99, parseInt(selfCompleteAfterSlider.value, 10) || 0)) / 100;
   const ccDefaultOn = document.getElementById('ccDefaultOn').checked;
+  const autoplay = document.getElementById('autoplay').checked;
   const enableAck = document.getElementById('enableAck').checked;
   const ackText = document.getElementById('ackText').value.trim() || 'I confirm that I have watched this video and understand its content.';
   const ackBtnLabel = document.querySelector('input[name=ackBtn]:checked').value;
@@ -3319,10 +3350,10 @@ generateBtn.addEventListener('click', async () => {
     }
     const hasCaptions = !!vttText;
 
-    const playerHTML = buildPlayerHTML(title, 'video.mp4', vttText, desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, externalLinks, playerTheme, selfCompleteAfter);
+    const playerHTML = buildPlayerHTML(title, 'video.mp4', vttText, desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, externalLinks, playerTheme, selfCompleteAfter, autoplay);
     const keepImportedId = importedManifestId && document.getElementById('keepId').checked;
     const manifest = buildManifest(title, hasCaptions, durationSecs, desc, keepImportedId ? importedManifestId : null);
-    const configXml = buildConfigXml(title, 'video.mp4', desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, externalLinks, playerTheme, selfCompleteAfter);
+    const configXml = buildConfigXml(title, 'video.mp4', desc, threshold, allowSelfComplete, enableAck, ackText, ackBtnLabel, ccDefaultOn, externalLinks, playerTheme, selfCompleteAfter, autoplay);
 
     const entries = [
       { name: 'imsmanifest.xml', data: manifest },

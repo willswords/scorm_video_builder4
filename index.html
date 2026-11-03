@@ -592,6 +592,7 @@ const CFG={
   ackText:"I confirm that I have watched this video and understand its content.",
   ackBtnLabel:"Acknowledge",
   ccDefaultOn:false,
+  autoplay:false,
   theme:"clean",
   links:[]
 };
@@ -657,6 +658,7 @@ const configReady=fetch('config.xml')
       const asc=g('allow-self-complete');if(asc!==null)CFG.allowSelfComplete=asc!=='false';
       const sca=g('self-complete-after');if(sca!==null){const n=parseFloat(sca);if(!isNaN(n))CFG.selfCompleteAfter=Math.max(0,Math.min(100,n))/100;}
       const ccd=g('cc-default-on');if(ccd!==null)CFG.ccDefaultOn=ccd==='true';
+      const ap=g('autoplay');if(ap!==null)CFG.autoplay=ap==='true';
       const ackEl=xdoc.querySelector('acknowledgment');
       if(ackEl){
         CFG.enableAck=ackEl.getAttribute('enabled')==='true';
@@ -841,7 +843,25 @@ vid.addEventListener('loadedmetadata',async ()=>{
   }
   updateStats(); // also records completion if the restored progress already meets the threshold
   draw();
+  if(CFG.autoplay&&vid.paused)autoplayStart();
 });
+
+// Autoplay option: try to play with sound once the saved position is restored. Browsers can
+// refuse until the learner has clicked on the site; the player then just stays paused with its
+// play button, as it does without the option (no muted fallback, so audio is never missed unnoticed)
+function autoplayStart(){
+  const resumed=rb.classList.contains('on');
+  const p=vid.play();
+  if(!p||!p.then)return;
+  p.then(()=>{
+    if(!resumed)return;
+    // Already playing from the saved position, so the message stays briefly without its Resume button
+    rsub.textContent='Resumed from '+ft(resumeTime)+' — '+pctOf(frac())+'% previously watched';
+    resumeBtn.style.display='none';
+    rb.classList.add('on');
+    setTimeout(()=>{rb.classList.remove('on');resumeBtn.style.display='';},6000);
+  }).catch(()=>{});
+}
 
 resumeBtn.addEventListener('click',()=>{
   vid.currentTime=resumeTime;
