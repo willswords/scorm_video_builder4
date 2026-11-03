@@ -2,6 +2,17 @@
 
 ## 2026-11-03
 
+### Builder
+
+- **Captions can be edited in the builder.** **Preview captions** is now **Preview and edit captions**. With it open, each cue's text and timing can be changed in place:
+  - **Text:** click a line to edit it. Enter adds a new line within the cue. Emptying a cue's text leaves it out of the package.
+  - **Timing:** edit `start --> end` (for example `00:01.000 --> 00:04.500`); any position settings after it can stay. An invalid timing, or an end before the start, is marked in red and isn't used; leaving the field puts the last valid timing back.
+  - **▶ Play** plays the preview video from that cue, opening the video preview if needed. **✕** deletes the cue.
+  - **+ Add cue** adds a cue where the preview video is paused, in time order, and puts the cursor in it ready to type. It lasts 2 seconds, or ends where the next cue starts if that's sooner, so the two don't show together. This also works for a captions file with no cues yet. Leaving a new cue empty leaves it out of the package.
+  - The preview video's captions update as you type. The captions file shows "edited", and the package gets the edited captions.
+  - **Download .vtt** saves the captions with your changes. **Undo all changes** goes back to the file as loaded.
+  - Cues you don't edit, and any notes or styling in the file, are kept as they were. If nothing is edited, the file goes into the package exactly as before. SRT files are converted to VTT first, as before.
+
 ### Video player
 
 Packages built before this change keep the old player. To update one, import it into the builder (**Start from an existing package**) and build it again.
