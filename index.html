@@ -810,8 +810,10 @@ window.addEventListener('DOMContentLoaded',async ()=>{
 // Restore bookmark once video metadata is available
 vid.addEventListener('loadedmetadata',async ()=>{
   dur=vid.duration;
-  buckets=new Array(Math.ceil(dur/GRAN)).fill(false);
-  lastMarkTime=0;
+  // If the browser reloads the same video (this event again), keep what has been watched so far
+  const n=Math.ceil(dur/GRAN);
+  if(buckets.length!==n)buckets=new Array(n).fill(false);
+  resetMarkClock();
   resize();
   sw.setAttribute('aria-valuemax',Math.round(dur));
   updateThumb();
@@ -1098,14 +1100,19 @@ vid.addEventListener('ended',()=>{
   }
 });
 
-let lastMarkTime=0;
+let lastMarkTime=0, lastMarkWall=0;
+// Restart the fill from where the video is now (after a seek, a drag, or when playback starts)
+function resetMarkClock(){lastMarkTime=vid.currentTime;lastMarkWall=performance.now();}
 function mark(){
-  if(!dur||drag||isSeeking)return;  // don't mark while scrubbing or seeking
-  const now=vid.currentTime;
-  // Guard: if time jumped by more than 2s it's an undetected seek (common with
-  // native fullscreen controls where the seeking event can arrive late). Reset
-  // the fill origin to the new position without marking the skipped range.
-  if(Math.abs(now-lastMarkTime)>2){lastMarkTime=now;return;}
+  if(!dur||drag||vid.seeking)return;  // don't mark while scrubbing or seeking
+  const now=vid.currentTime, wall=performance.now();
+  // A jump with no seeking event is an undetected seek (native fullscreen controls can send the
+  // seeking event late), so the skipped range isn't marked. Tell it apart from normal playback by
+  // the real time that passed: when the page is busy (for example an LMS that takes a few seconds
+  // to save progress), these updates arrive late but the video kept playing, so that part counts.
+  const allowed=(wall-lastMarkWall)/1000*(vid.playbackRate||1)+1;
+  lastMarkWall=wall;
+  if(now<lastMarkTime||now-lastMarkTime>allowed){lastMarkTime=now;return;}
   const from=Math.floor(lastMarkTime/GRAN);
   const to=Math.floor(now/GRAN);
   const lo=Math.max(0,Math.min(from,to));
@@ -1143,7 +1150,7 @@ function updateThumb(){
 }
 
 // ── Seekbar drag + hover preview ───────────────────────────────────────────
-let drag=false, isSeeking=false;
+let drag=false;
 const scrubPrev=document.getElementById('scrubPrev');
 const prevVid=document.getElementById('prevVid');
 function positionScrubPrev(frac,r){
@@ -1166,16 +1173,26 @@ function seekTo(e){
   th.style.left=(frac*100)+'%';
   if(drag)positionScrubPrev(frac,r);
 }
-sw.addEventListener('mousedown',e=>{
+// Mouse drags capture the pointer, so the release is always seen, even outside the course frame;
+// while dragging nothing is marked, so a drag that never ended would stop all progress recording
+sw.addEventListener('pointerdown',e=>{
+  if(e.pointerType!=='mouse'||e.button!==0)return;  // touch uses the touch handlers below; right-click doesn't scrub
   drag=true;
+  try{sw.setPointerCapture(e.pointerId);}catch(err){}
   if(scrubPrev)scrubPrev.classList.add('on');
   seekTo(e);
 });
-document.addEventListener('mousemove',e=>{if(drag)seekTo(e);});
-document.addEventListener('mouseup',()=>{
+sw.addEventListener('pointermove',e=>{if(drag)seekTo(e);});
+function endDrag(){
+  if(!drag)return;
   drag=false;
   if(scrubPrev)scrubPrev.classList.remove('on');
-});
+  resetMarkClock();
+}
+sw.addEventListener('pointerup',endDrag);
+sw.addEventListener('pointercancel',endDrag);
+sw.addEventListener('lostpointercapture',endDrag);
+window.addEventListener('blur',endDrag);
 // Hover preview (no drag)
 sw.addEventListener('mousemove',e=>{
   if(drag||!dur||!scrubPrev||!prevVid)return;
@@ -1212,12 +1229,18 @@ sw.addEventListener('mousemove',e=>{
 document.getElementById('rwb').addEventListener('click',()=>{
   vid.currentTime=Math.max(0,vid.currentTime-5);
 });
-// Reset fill-forward origin after any seek so skipping doesn't mark unvisited buckets
-vid.addEventListener('seeking',()=>{isSeeking=true;});
+// Reset fill-forward origin as soon as a seek starts (a timeupdate can arrive before 'seeked') and
+// after it, so skipping doesn't mark unvisited buckets; and when playback starts or resumes, so time
+// spent paused or buffering isn't counted as playing time
+vid.addEventListener('seeking',resetMarkClock);
 vid.addEventListener('seeked',()=>{
-  isSeeking=false;lastMarkTime=vid.currentTime;
+  resetMarkClock();
   if(drag)drawScrubFrame(vid);
 });
+vid.addEventListener('play',resetMarkClock);
+vid.addEventListener('playing',resetMarkClock);
+// Record up to the exact point where the learner paused
+vid.addEventListener('pause',()=>{mark();updateStats();draw();});
 sw.addEventListener('touchstart',e=>seekTo(e.touches[0]),{passive:true});
 sw.addEventListener('touchmove',e=>seekTo(e.touches[0]),{passive:true});
 
